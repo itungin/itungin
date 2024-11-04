@@ -8,6 +8,8 @@ import (
 )
 
 func init() {
+	config.InitMongoDB()
+
 	// Mengecek apakah koneksi database berhasil
 	if config.ErrorMongoconn != nil {
 		log.Fatalf("Gagal terhubung ke MongoDB: %v", config.ErrorMongoconn)
