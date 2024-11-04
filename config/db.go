@@ -1,16 +1,17 @@
 package config
 
 import (
-	"os"
-
 	"github.com/gocroot/helper/atdb"
 )
 
-var MongoString string = os.Getenv("MONGOSTRING")
+// Mendefinisikan MongoString secara langsung
+var MongoString string = "mongodb+srv://karamissuu:karamissu1@cluster0.lyovb.mongodb.net/"
 
+// Konfigurasi database dengan nama 'akuntan'
 var mongoinfo = atdb.DBInfo{
 	DBString: MongoString,
-	DBName:   "petapedia",
+	DBName:   "akuntan",
 }
 
+// Membuat koneksi ke MongoDB
 var Mongoconn, ErrorMongoconn = atdb.MongoConnect(mongoinfo)
