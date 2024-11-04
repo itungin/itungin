@@ -185,6 +185,19 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.VerifyPasswordHandler(w, r)
 	case method == "POST" && path == "/auth/resend":
 		controller.ResendPasswordHandler(w, r)
+		// Produk
+	case method == "POST" && path == "/products":
+		controller.CreateProduct(w, r)
+	case method == "GET" && path == "/products":
+		controller.GetProducts(w, r)
+	case method == "GET" && path == "/products/{id}":
+		controller.GetProductByID(w, r)
+	case method == "PUT" && path == "/products/{id}":
+		controller.UpdateProduct(w, r)
+	case method == "DELETE" && path == "/products/{id}":
+		controller.DeleteProduct(w, r)
+	case method == "GET" && path == "/products-export-csv":
+		controller.ExportProductsToCSV(w, r)
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
