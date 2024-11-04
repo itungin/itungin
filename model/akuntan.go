@@ -71,3 +71,13 @@ type LaporanAkuntan struct {
 	Profit    float64   `bson:"profit" json:"profit"`
 	CreatedAt time.Time `bson:"createdAt" json:"createdAt"`
 }
+
+type Employee struct {
+    ID           int       `json:"id" bson:"_id"`
+    Name    string    `json:"name" bson:"name"`
+    Email        string    `json:"email" bson:"email"`
+    PhoneNumber  string    `json:"phone_number" bson:"phone_number"`
+    Position     string    `json:"position" bson:"position"`
+    CreatedAt    time.Time `json:"created_at" bson:"created_at"`
+    UpdatedAt    time.Time `json:"updated_at" bson:"updated_at"`
+}
