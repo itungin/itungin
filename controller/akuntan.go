@@ -269,3 +269,30 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Customer created successfully"})
 }
 
+// GetCustomers handles retrieving all customers
+func GetCustomers(w http.ResponseWriter, r *http.Request) {
+	var customers []model.Customer
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := config.CustomerCollection.Find(ctx, bson.M{})
+	if err != nil {
+		http.Error(w, "Failed to fetch customers", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var cust model.Customer
+		if err := cursor.Decode(&cust); err != nil {
+			http.Error(w, "Error decoding customer", http.StatusInternalServerError)
+			return
+		}
+		customers = append(customers, cust)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(customers)
+}
+
