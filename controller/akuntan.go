@@ -243,3 +243,29 @@ func formatPrice(price float64) string {
 func formatStock(stock int) string {
 	return fmt.Sprintf("%d", stock)
 }
+
+// controller pelanggan
+// CreateCustomer handles creating a new customer
+func CreateCustomer(w http.ResponseWriter, r *http.Request) {
+	var newCustomer model.Customer
+	if err := json.NewDecoder(r.Body).Decode(&newCustomer); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	newCustomer.CreatedAt = time.Now()
+	newCustomer.UpdatedAt = time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := config.CustomerCollection.InsertOne(ctx, newCustomer)
+	if err != nil {
+		http.Error(w, "Failed to create customer", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Customer created successfully"})
+}
+
