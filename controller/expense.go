@@ -1,12 +1,12 @@
 package controller
 
 import (
-    "context"
-    "encoding/json"
-    "net/http"
-    "time"
-    "encoding/csv"
-    "fmt"
+	"context"
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
