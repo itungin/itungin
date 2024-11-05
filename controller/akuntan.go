@@ -360,3 +360,27 @@ func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Customer updated successfully"})
 }
 
+// DeleteCustomer handles deleting a customer by ID
+func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
+	// Ambil parameter ID dari URL menggunakan gorilla/mux
+	vars := mux.Vars(r)
+	id := vars["id"]
+	
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = config.CustomerCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	if err != nil {
+		http.Error(w, "Failed to delete customer", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted successfully"})
+}
