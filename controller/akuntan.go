@@ -319,3 +319,44 @@ func GetCustomerByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(customer)
 }
 
+// UpdateCustomer handles updating a customer by ID
+func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
+	// Ambil parameter ID dari URL menggunakan gorilla/mux
+	vars := mux.Vars(r)
+	id := vars["id"]
+	
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		return
+	}
+
+	var updatedCustomer model.Customer
+	if err := json.NewDecoder(r.Body).Decode(&updatedCustomer); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	update := bson.M{
+		"$set": bson.M{
+			"name":      updatedCustomer.Name,
+			"email":     updatedCustomer.Email,
+			"phone":     updatedCustomer.Phone,
+			"address":   updatedCustomer.Address,
+			"updatedAt": time.Now(),
+		},
+	}
+
+	_, err = config.CustomerCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	if err != nil {
+		http.Error(w, "Failed to update customer", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Customer updated successfully"})
+}
+
