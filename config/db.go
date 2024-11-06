@@ -30,6 +30,7 @@ var SalesTransactionCollection *mongo.Collection
 var ExpenseTransactionCollection *mongo.Collection
 var CustomerCollection *mongo.Collection
 var ReportCollection *mongo.Collection
+var EmployeeCollection *mongo.Collection
 
 // Fungsi untuk menginisialisasi koneksi ke MongoDB
 func InitMongoDB() {
@@ -57,6 +58,8 @@ func InitMongoDB() {
 	ExpenseTransactionCollection = client.Database("akuntan").Collection("transaksi_pengeluaran")
 	CustomerCollection = client.Database("akuntan").Collection("pelanggan")
 	ReportCollection = client.Database("akuntan").Collection("laporan")
+	EmployeeCollection = client.Database("akuntan").Collection("employee")
+
 }
 
 
