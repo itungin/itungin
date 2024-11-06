@@ -9,6 +9,7 @@ var Origins = []string{
 	"https://www.bukupedia.co.id",
 	"https://naskah.bukupedia.co.id",
 	"https://bukupedia.co.id",
+	"http://127.0.0.1:5500", // Origin lokal untuk pengujian
 }
 
 // Fungsi untuk memeriksa apakah origin diizinkan
@@ -23,24 +24,28 @@ func isAllowedOrigin(origin string) bool {
 
 // Fungsi untuk mengatur header CORS
 func SetAccessControlHeaders(w http.ResponseWriter, r *http.Request) bool {
-	origin := r.Header.Get("Origin")
+    origin := r.Header.Get("Origin")
 
-	if isAllowedOrigin(origin) {
-		// Set CORS headers for the preflight request
-		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Login")
-			w.Header().Set("Access-Control-Allow-Methods", "POST,GET,DELETE,PUT")
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Max-Age", "3600")
-			w.WriteHeader(http.StatusNoContent)
-			return true
-		}
-		// Set CORS headers for the main request.
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		return false
-	}
+    // Pastikan origin yang diminta diizinkan
+    if isAllowedOrigin(origin) || origin == "" {
+        // Tangani preflight request (OPTIONS)
+        if r.Method == http.MethodOptions {
+            w.Header().Set("Access-Control-Allow-Credentials", "true")
+            w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Login")
+            w.Header().Set("Access-Control-Allow-Methods", "POST, GET, DELETE, PUT, OPTIONS")
+            w.Header().Set("Access-Control-Allow-Origin", origin)  // Set header origin yang diizinkan
+            w.Header().Set("Access-Control-Max-Age", "3600")       // Cache preflight request selama 1 jam
+            w.WriteHeader(http.StatusNoContent)                     // Tidak ada konten, status OK untuk preflight
+            return true
+        }
 
-	return false
+        // Tangani permintaan utama (GET, POST, PUT, DELETE, dll.)
+        w.Header().Set("Access-Control-Allow-Credentials", "true")
+        w.Header().Set("Access-Control-Allow-Origin", origin) // Set origin yang diizinkan
+        w.Header().Set("Access-Control-Allow-Methods", "POST, GET, DELETE, PUT, OPTIONS") // Pastikan metode lainnya diizinkan
+        return false
+    }
+
+    // Jika origin tidak diizinkan, tidak ada header CORS yang diatur
+    return false
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/gocroot/config"
 	"github.com/gocroot/controller"
 	"github.com/gocroot/helper/at"
+	// "github.com/gocroot/helper/at"
 )
 
 func URL(w http.ResponseWriter, r *http.Request) {
@@ -190,11 +191,11 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.CreateProduct(w, r)
 	case method == "GET" && path == "/products":
 		controller.GetProducts(w, r)
-	case method == "GET" && path == "/products/{id}":
+	case method == "GET" && path == "/product-id":
 		controller.GetProductByID(w, r)
-	case method == "PUT" && path == "/products/{id}":
+	case method == "PUT" && path == "/products":
 		controller.UpdateProduct(w, r)
-	case method == "DELETE" && path == "/products/{id}":
+	case method == "DELETE" && path == "/products":
 		controller.DeleteProduct(w, r)
 	case method == "GET" && path == "/products-export-csv":
 		controller.ExportProductsToCSV(w, r)
@@ -211,7 +212,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteExpense(w, r)
 	case method == "GET" && path == "/expense-export-csv":
 		controller.ExportProductsToCSV(w, r)
-						// Sales
+	// Sales
 	case method == "POST" && path == "/sales":
 		controller.CreateSalesTransaction(w, r)
 	case method == "GET" && path == "/sales":
@@ -224,6 +225,27 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteSalesTransaction(w, r)
 	case method == "GET" && path == "/sales-export-csv":
 		controller.ExportProductsToCSV(w, r)
+	// Pelanggan
+	case method == "POST" && path == "/customers":
+		controller.CreateCustomer(w, r)
+	case method == "GET" && path == "/customers":
+		controller.GetCustomers(w, r)
+	case method == "GET" && path == "/customer-id":
+		controller.GetCustomerByID(w, r)
+	case method == "PUT" && path == "/customers":
+		controller.UpdateCustomer(w, r)
+	case method == "DELETE" && path == "/customers":
+		controller.DeleteCustomer(w, r)
+	// Laporan Akuntan
+	case method == "POST" && path == "/reports":
+		controller.CreateFinancialReport(w, r)
+	case method == "GET" && path == "/reports":
+		controller.GetFinancialReports(w, r)
+	case method == "GET" && path == "/report-id":
+		controller.GetFinancialReportByID(w, r)
+	case method == "DELETE" && path == "/reports":
+		controller.DeleteFinancialReport(w, r)
+
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
