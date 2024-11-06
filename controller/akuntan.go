@@ -384,3 +384,50 @@ func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted successfully"})
 }
+
+
+
+// Handler Laporan
+// Handler untuk membuat laporan keuangan
+func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
+	var newReport model.LaporanAkuntan
+
+	// Decode JSON request body
+	if err := json.NewDecoder(r.Body).Decode(&newReport); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Parse tanggal dari string ke time.Time
+	startDate, err := time.Parse("2006-01-02", newReport.StartDate) // Mengambil dari objek
+	if err != nil {
+		http.Error(w, "Invalid start date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", newReport.EndDate) // Mengambil dari objek
+	if err != nil {
+		http.Error(w, "Invalid end date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		return
+	}
+
+	// Set waktu pembuatan
+	newReport.StartDateTime = startDate // Pastikan field ini ada di model
+	newReport.EndDateTime = endDate     // Pastikan field ini ada di model
+	newReport.CreatedAt = time.Now()
+
+	// Simpan ke MongoDB
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	newReport.ID = primitive.NewObjectID()
+	_, err = config.ReportCollection.InsertOne(ctx, newReport)
+	if err != nil {
+		http.Error(w, "Failed to create financial report", http.StatusInternalServerError)
+		return
+	}
+
+	// Kirim respon sukses
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report created successfully"})
+}
+
