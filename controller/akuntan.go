@@ -11,7 +11,6 @@ import (
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
 
-	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -513,25 +512,32 @@ func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk menghapus laporan keuangan berdasarkan ID
 func DeleteFinancialReport(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan gorilla/mux
-	vars := mux.Vars(r)
-	id := vars["id"]
+	// Get the report ID from URL query parameters
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Report ID is required", http.StatusBadRequest)
+		return
+	}
 
+	// Convert the string ID to ObjectID (assuming MongoDB)
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		http.Error(w, "Invalid report ID", http.StatusBadRequest)
 		return
 	}
 
+	// Context with a timeout for MongoDB operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Delete the report document from the database
 	_, err = config.ReportCollection.DeleteOne(ctx, bson.M{"_id": objectID})
 	if err != nil {
 		http.Error(w, "Failed to delete financial report", http.StatusInternalServerError)
 		return
 	}
 
+	// Return a success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report deleted successfully"})
 }
