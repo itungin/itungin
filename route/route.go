@@ -245,7 +245,17 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.GetFinancialReportByID(w, r)
 	case method == "DELETE" && path == "/reports":
 		controller.DeleteFinancialReport(w, r)
-
+			// Pelanggan
+	case method == "POST" && path == "/employee":
+		controller.CreateEmployee(w, r)
+	case method == "GET" && path == "/employee":
+		controller.GetEmployees(w, r)
+	case method == "GET" && path == "/employee/{id}":
+		controller.GetEmployeeByID(w, r)
+	case method == "PUT" && path == "/employee/{id}":
+		controller.UpdateEmployee(w, r)
+	case method == "DELETE" && path == "/employee/{id}":
+		controller.DeleteEmployee(w, r)
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
