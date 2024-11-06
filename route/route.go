@@ -393,6 +393,20 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	router.HandleFunc("/sales/{id}", controller.DeleteSalesTransaction).Methods("DELETE")
 	router.HandleFunc("/sales-export-csv", controller.ExportProductsToCSV).Methods("GET")
 
+	
+	// Customers
+	router.HandleFunc("/pelanggan", controller.CreateCustomer).Methods("POST")
+	router.HandleFunc("/pelanggan", controller.GetCustomers).Methods("GET")
+	router.HandleFunc("/pelanggan/{id}", controller.GetCustomerByID).Methods("GET")
+	router.HandleFunc("/pelanggan/{id}", controller.UpdateCustomer).Methods("PUT")
+	router.HandleFunc("/pelanggan/{id}", controller.DeleteCustomer).Methods("DELETE")
+
+	// Financial Reports
+	router.HandleFunc("/laporan", controller.CreateFinancialReport).Methods("POST")
+	router.HandleFunc("/laporan", controller.GetFinancialReports).Methods("GET")
+	router.HandleFunc("/laporan/{id}", controller.GetFinancialReportByID).Methods("GET")
+	router.HandleFunc("/laporan/{id}", controller.DeleteFinancialReport).Methods("DELETE")
+
 	// Adding routes to handle dynamic parameters
 	router.HandleFunc("/data/sale/{id}", controller.GetSalesTransactions).Methods("GET")
 
