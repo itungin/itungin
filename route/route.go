@@ -237,13 +237,13 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "DELETE" && path == "/customers":
 		controller.DeleteCustomer(w, r)
 	// Laporan Akuntan
-	case method == "POST" && path == "/laporan":
+	case method == "POST" && path == "/reports":
 		controller.CreateFinancialReport(w, r)
-	case method == "GET" && path == "/laporan":
+	case method == "GET" && path == "/reports":
 		controller.GetFinancialReports(w, r)
-	case method == "GET" && path == "/laporan/{id}":
+	case method == "GET" && path == "/report-id":
 		controller.GetFinancialReportByID(w, r)
-	case method == "DELETE" && path == "/laporan/{id}":
+	case method == "DELETE" && path == "/reports":
 		controller.DeleteFinancialReport(w, r)
 
 	// Google Auth
