@@ -195,7 +195,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.GetProductByID(w, r)
 	case method == "PUT" && path == "/products":
 		controller.UpdateProduct(w, r)
-	case method == "DELETE" && path == "/products/{id}":
+	case method == "DELETE" && path == "/products":
 		controller.DeleteProduct(w, r)
 	case method == "GET" && path == "/products-export-csv":
 		controller.ExportProductsToCSV(w, r)
