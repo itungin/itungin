@@ -480,3 +480,28 @@ func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(reports)
 }
+
+// Fungsi untuk menghapus laporan keuangan berdasarkan ID
+func DeleteFinancialReport(w http.ResponseWriter, r *http.Request) {
+	// Ambil parameter ID dari URL menggunakan gorilla/mux
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = config.ReportCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	if err != nil {
+		http.Error(w, "Failed to delete financial report", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report deleted successfully"})
+}
