@@ -198,7 +198,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteProduct(w, r)
 	case method == "GET" && path == "/products-export-csv":
 		controller.ExportProductsToCSV(w, r)
-				// Expense
+		// Expense
 	case method == "POST" && path == "/expense":
 		controller.CreateExpenseTransaction(w, r)
 	case method == "GET" && path == "/expense":
