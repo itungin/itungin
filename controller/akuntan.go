@@ -453,3 +453,30 @@ func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(report)
 }
+
+// Handler untuk mendapatkan semua laporan keuangan
+func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
+	var reports []model.LaporanAkuntan
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := config.ReportCollection.Find(ctx, bson.M{})
+	if err != nil {
+		http.Error(w, "Failed to fetch financial reports", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var rep model.LaporanAkuntan
+		if err := cursor.Decode(&rep); err != nil {
+			http.Error(w, "Error decoding financial report", http.StatusInternalServerError)
+			return
+		}
+		reports = append(reports, rep)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(reports)
+}
