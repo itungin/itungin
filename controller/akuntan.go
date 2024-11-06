@@ -384,28 +384,36 @@ func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 
 // DeleteCustomer handles deleting a customer by ID
 func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan gorilla/mux
-	vars := mux.Vars(r)
-	id := vars["id"]
-	
+	// Get the customer ID from URL query parameters
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert the string ID to ObjectID (assuming MongoDB)
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
 		return
 	}
 
+	// Context with a timeout for MongoDB operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Delete the customer document from the database
 	_, err = config.CustomerCollection.DeleteOne(ctx, bson.M{"_id": objectID})
 	if err != nil {
 		http.Error(w, "Failed to delete customer", http.StatusInternalServerError)
 		return
 	}
 
+	// Return a success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted successfully"})
 }
+
 
 
 
