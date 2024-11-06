@@ -158,9 +158,12 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk menghapus produk berdasarkan ID
 func DeleteProduct(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan gorilla/mux
-	vars := mux.Vars(r)
-	id := vars["id"]
+	// Ambil parameter ID dari URL menggunakan query parameter
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Product ID is required", http.StatusBadRequest)
+		return
+	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -182,6 +185,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Product deleted successfully"})
 }
+
 
 
 // Fungsi untuk mengekspor data produk ke CSV

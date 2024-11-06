@@ -191,9 +191,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.CreateProduct(w, r)
 	case method == "GET" && path == "/products":
 		controller.GetProducts(w, r)
-	case method == "GET" && path == "/products/{id}":
+	case method == "GET" && path == "/product-id":
 		controller.GetProductByID(w, r)
-	case method == "PUT" && path == "/products/{id}":
+	case method == "PUT" && path == "/products":
 		controller.UpdateProduct(w, r)
 	case method == "DELETE" && path == "/products/{id}":
 		controller.DeleteProduct(w, r)
