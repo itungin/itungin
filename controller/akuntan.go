@@ -431,3 +431,25 @@ func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report created successfully"})
 }
 
+// Fungsi untuk mendapatkan laporan keuangan berdasarkan ID
+func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		return
+	}
+
+	var report model.LaporanAkuntan
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = config.ReportCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&report)
+	if err != nil {
+		http.Error(w, "Financial report not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(report)
+}
