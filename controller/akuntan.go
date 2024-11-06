@@ -74,9 +74,12 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk mendapatkan detail produk berdasarkan ID
 func GetProductByID(w http.ResponseWriter, r *http.Request) {
-    // Ambil parameter ID dari URL menggunakan mux.Vars
-    vars := mux.Vars(r)
-    id := vars["id"]
+    // Ambil parameter ID dari URL menggunakan query parameter
+    id := r.URL.Query().Get("id")
+    if id == "" {
+        http.Error(w, "Product ID is required", http.StatusBadRequest)
+        return
+    }
 
     objectID, err := primitive.ObjectIDFromHex(id)
     if err != nil {
@@ -101,11 +104,15 @@ func GetProductByID(w http.ResponseWriter, r *http.Request) {
 }
 
 
+
 // Fungsi untuk mengupdate produk berdasarkan ID
 func UpdateProduct(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan gorilla/mux
-	vars := mux.Vars(r)
-	id := vars["id"]
+	// Ambil parameter ID dari URL menggunakan query parameter
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Product ID is required", http.StatusBadRequest)
+		return
+	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -145,6 +152,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Product updated successfully"})
 }
+
 
 
 
