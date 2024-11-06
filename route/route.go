@@ -235,6 +235,16 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.UpdateCustomer(w, r)
 	case method == "DELETE" && path == "/pelanggan/{id}":
 		controller.DeleteCustomer(w, r)
+	// Laporan Akuntan
+	case method == "POST" && path == "/laporan":
+		controller.CreateFinancialReport(w, r)
+	case method == "GET" && path == "/laporan":
+		controller.GetFinancialReports(w, r)
+	case method == "GET" && path == "/laporan/{id}":
+		controller.GetFinancialReportByID(w, r)
+	case method == "DELETE" && path == "/laporan/{id}":
+		controller.DeleteFinancialReport(w, r)
+
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
