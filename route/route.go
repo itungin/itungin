@@ -226,15 +226,15 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "GET" && path == "/sales-export-csv":
 		controller.ExportProductsToCSV(w, r)
 	// Pelanggan
-	case method == "POST" && path == "/pelanggan":
+	case method == "POST" && path == "/customers":
 		controller.CreateCustomer(w, r)
-	case method == "GET" && path == "/pelanggan":
+	case method == "GET" && path == "/customers":
 		controller.GetCustomers(w, r)
-	case method == "GET" && path == "/pelanggan/{id}":
+	case method == "GET" && path == "/customer-id":
 		controller.GetCustomerByID(w, r)
-	case method == "PUT" && path == "/pelanggan/{id}":
+	case method == "PUT" && path == "/customers":
 		controller.UpdateCustomer(w, r)
-	case method == "DELETE" && path == "/pelanggan/{id}":
+	case method == "DELETE" && path == "/customers":
 		controller.DeleteCustomer(w, r)
 	// Laporan Akuntan
 	case method == "POST" && path == "/laporan":
