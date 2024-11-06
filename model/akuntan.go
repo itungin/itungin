@@ -73,7 +73,7 @@ type LaporanAkuntan struct {
 }
 
 type Employee struct {
-    ID           int       `json:"id" bson:"_id"`
+    ID           primitive.ObjectID       `json:"id" bson:"_id"`
     Name    string    `json:"name" bson:"name"`
     Email        string    `json:"email" bson:"email"`
     PhoneNumber  string    `json:"phone_number" bson:"phone_number"`
