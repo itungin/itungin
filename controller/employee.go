@@ -22,6 +22,8 @@ func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Mengatur ID otomatis dan timestamps
+	newEmployee.ID = primitive.NewObjectID()
 	newEmployee.CreatedAt = time.Now()
 	newEmployee.UpdatedAt = time.Now()
 
@@ -37,6 +39,7 @@ func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Employee created successfully"})
 }
+
 
 // GetEmployees returns all employees
 func GetEmployees(w http.ResponseWriter, r *http.Request) {
@@ -153,3 +156,5 @@ func DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Employee deleted successfully"})
 }
+
+
