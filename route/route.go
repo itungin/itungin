@@ -211,7 +211,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteExpense(w, r)
 	case method == "GET" && path == "/expense-export-csv":
 		controller.ExportProductsToCSV(w, r)
-						// Sales
+	// Sales
 	case method == "POST" && path == "/sales":
 		controller.CreateSalesTransaction(w, r)
 	case method == "GET" && path == "/sales":
@@ -224,6 +224,17 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteSalesTransaction(w, r)
 	case method == "GET" && path == "/sales-export-csv":
 		controller.ExportProductsToCSV(w, r)
+	// Pelanggan
+	case method == "POST" && path == "/pelanggan":
+		controller.CreateCustomer(w, r)
+	case method == "GET" && path == "/pelanggan":
+		controller.GetCustomers(w, r)
+	case method == "GET" && path == "/pelanggan/{id}":
+		controller.GetCustomerByID(w, r)
+	case method == "PUT" && path == "/pelanggan/{id}":
+		controller.UpdateCustomer(w, r)
+	case method == "DELETE" && path == "/pelanggan/{id}":
+		controller.DeleteCustomer(w, r)
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
