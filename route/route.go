@@ -210,7 +210,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.UpdateExpense(w, r)
 	case method == "DELETE" && path == "/expense":
 		controller.DeleteExpense(w, r)
-	case method == "GET" && path == "/expense/export/csv":
+	case method == "GET" && path == "/expense-export-csv":
 		controller.ExportProductsToCSV(w, r)
 	// Sales
 	case method == "POST" && path == "/sales":
@@ -257,15 +257,15 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "DELETE" && path == "/employee":
 		controller.DeleteEmployee(w, r)
 				// Produk
-	case method == "POST" && path == "/categories":
+	case method == "POST" && path == "/category":
 		controller.CreateCategory(w, r)
 	case method == "GET" && path == "/categories":
 		controller.GetCategories(w, r)
-	case method == "GET" && path == "/categories/{id}":
+	case method == "GET" && path == "/category":
 		controller.GetCategoryByID(w, r)
-	case method == "PUT" && path == "/categories/{id}":
+	case method == "PUT" && path == "/category":
 		controller.UpdateCategory(w, r)
-	case method == "DELETE" && path == "/categories/{id}":
+	case method == "DELETE" && path == "/category":
 		controller.DeleteCategory(w, r)
 	// Google Auth
 	default:
