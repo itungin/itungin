@@ -202,15 +202,15 @@ func URL(w http.ResponseWriter, r *http.Request) {
 				// Expense
 	case method == "POST" && path == "/expense":
 		controller.CreateExpenseTransaction(w, r)
-	case method == "GET" && path == "/expense":
+	case method == "GET" && path == "/expenses":
 		controller.GetExpenses(w, r)
-	case method == "GET" && path == "/expense/{id}":
+	case method == "GET" && path == "/expense":
 		controller.GetExpenseByID(w, r)
-	case method == "PUT" && path == "/expense/{id}":
+	case method == "PUT" && path == "/expense":
 		controller.UpdateExpense(w, r)
-	case method == "DELETE" && path == "/expense/{id}":
+	case method == "DELETE" && path == "/expense":
 		controller.DeleteExpense(w, r)
-	case method == "GET" && path == "/expense-export-csv":
+	case method == "GET" && path == "/expense/export/csv":
 		controller.ExportProductsToCSV(w, r)
 	// Sales
 	case method == "POST" && path == "/sales":
