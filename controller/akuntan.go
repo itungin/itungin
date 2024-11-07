@@ -62,32 +62,40 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk mendapatkan daftar produk
 func GetProducts(w http.ResponseWriter, r *http.Request) {
-	var products []model.Product
-
-	// Ambil data dari MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.ProductCollection.Find(ctx, bson.M{})
+	// Ambil semua data produk dari MongoDB
+	data, err := atdb.GetAllDoc[[]model.Product](config.Mongoconn, "products", primitive.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Data produk tidak ditemukan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var prod model.Product
-		if err := cursor.Decode(&prod); err != nil {
-			http.Error(w, "Error decoding product", http.StatusInternalServerError)
-			return
-		}
-		products = append(products, prod)
+	if len(data) == 0 {
+		var response model.Response
+		response.Status = "Error: Data produk kosong"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	// Format hasil sebagai slice of map dengan ID, Name, Description, Price, Stock, dan CreatedAt untuk setiap produk
+	var products []map[string]interface{}
+	for _, product := range data {
+		products = append(products, map[string]interface{}{
+			"id":          product.ID,
+			"name":        product.Name,
+			"description": product.Description,
+			"price":       product.Price,
+			"stock":       product.Stock,
+			"createdAt":   product.CreatedAt,
+		})
 	}
 
 	// Kirim data produk sebagai respon
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
+	at.WriteJSON(w, http.StatusOK, products)
 }
+
 
 // Fungsi untuk mendapatkan detail produk berdasarkan ID
 func GetProductByID(w http.ResponseWriter, r *http.Request) {
