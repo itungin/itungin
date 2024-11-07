@@ -141,52 +141,78 @@ func GetProductByID(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk mengupdate produk berdasarkan ID
 func UpdateProduct(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan query parameter
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Product ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
-		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Produk tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	// Decode data produk yang akan diupdate
-	var updatedProduct model.Product
-	if err := json.NewDecoder(r.Body).Decode(&updatedProduct); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var requestBody struct {
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		Category    string  `json:"category"`
+		Stock       int     `json:"stock"`
+	}
+	err = json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal membaca data JSON"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Update produk di MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	update := bson.M{
-		"$set": bson.M{
-			"name":        updatedProduct.Name,
-			"description": updatedProduct.Description,
-			"price":       updatedProduct.Price,
-			"category":    updatedProduct.Category,
-			"stock":       updatedProduct.Stock,
-			"updatedAt":   time.Now(),
-		},
+	// Siapkan data untuk update
+	updateData := bson.M{}
+	if requestBody.Name != "" {
+		updateData["name"] = requestBody.Name
 	}
+	if requestBody.Description != "" {
+		updateData["description"] = requestBody.Description
+	}
+	if requestBody.Price != 0 {
+		updateData["price"] = requestBody.Price
+	}
+	if requestBody.Category != "" {
+		updateData["category"] = requestBody.Category
+	}
+	if requestBody.Stock != 0 {
+		updateData["stock"] = requestBody.Stock
+	}
+	updateData["updatedAt"] = time.Now()
 
-	_, err = config.ProductCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	// Update produk di MongoDB
+	filter := bson.M{"_id": objectID}
+	update := bson.M{"$set": updateData}
+	_, err = config.Mongoconn.Collection("products").UpdateOne(context.TODO(), filter, update)
 	if err != nil {
-		http.Error(w, "Failed to update product", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengupdate produk"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotModified, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Product updated successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk berhasil diupdate",
+		"data":    updateData,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
-
 
 
 
