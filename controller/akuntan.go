@@ -9,38 +9,56 @@ import (
 	"time"
 
 	"github.com/gocroot/config"
+	"github.com/gocroot/helper/at"
+	"github.com/gocroot/helper/atdb"
 	"github.com/gocroot/model"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-
 // Fungsi untuk menambahkan produk baru
 func CreateProduct(w http.ResponseWriter, r *http.Request) {
-	var newProduct model.Product // Model Produk
-	if err := json.NewDecoder(r.Body).Decode(&newProduct); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var product model.Product
+	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Set waktu pembuatan produk
-	newProduct.CreatedAt = time.Now()
+	// Inisialisasi data produk baru dengan ObjectID untuk ID
+	newProduct := model.Product{
+		ID:          primitive.NewObjectID(),
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Category:    product.Category,
+		Stock:       product.Stock,
+		CreatedAt:   time.Now(),
+	}
 
-	// Insert produk ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.ProductCollection.InsertOne(ctx, newProduct)
+	// Insert produk ke dalam MongoDB
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "products", newProduct)
 	if err != nil {
-		http.Error(w, "Failed to create product", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Product created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk berhasil ditambahkan",
+		"data":    newProduct,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
+
+
 
 // Fungsi untuk mendapatkan daftar produk
 func GetProducts(w http.ResponseWriter, r *http.Request) {
