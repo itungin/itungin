@@ -81,3 +81,12 @@ type Employee struct {
     CreatedAt    time.Time `json:"created_at" bson:"created_at"`
     UpdatedAt    time.Time `json:"updated_at" bson:"updated_at"`
 }
+
+// Category adalah struct untuk kategori produk
+type Category struct {
+    ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+    Name        string             `bson:"name" json:"name"`
+    Description string             `bson:"description" json:"description"`
+    CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
+    UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
+}
