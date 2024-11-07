@@ -97,12 +97,16 @@ func GetSalesTransactions(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk mendapatkan transaksi penjualan berdasarkan ID
 func GetSalesTransactionByID(w http.ResponseWriter, r *http.Request) {
-	// id := r.URL.Query().Get("id")
-	vars := mux.Vars(r)
-	id := vars["id"]
+	// Ambil ID dari query parameter
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Sales transaction ID is required", http.StatusBadRequest)
+		return
+	}
 
 	log.Println("ID received:", id) // Tambahkan log untuk debugging
 
+	// Konversi ID dari string ke ObjectID
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		http.Error(w, "Invalid sales transaction ID", http.StatusBadRequest)
@@ -124,6 +128,7 @@ func GetSalesTransactionByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(transaction)
 }
+
 
 // Fungsi untuk mengupdate transaksi penjualan berdasarkan ID
 func UpdateSalesTransaction(w http.ResponseWriter, r *http.Request) {
