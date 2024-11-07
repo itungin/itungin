@@ -256,6 +256,17 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.UpdateEmployee(w, r)
 	case method == "DELETE" && path == "/employee/{id}":
 		controller.DeleteEmployee(w, r)
+				// Produk
+	case method == "POST" && path == "/categories":
+		controller.CreateCategory(w, r)
+	case method == "GET" && path == "/categories":
+		controller.GetCategories(w, r)
+	case method == "GET" && path == "/categories/{id}":
+		controller.GetCategoryByID(w, r)
+	case method == "PUT" && path == "/categories/{id}":
+		controller.UpdateCategory(w, r)
+	case method == "DELETE" && path == "/categories/{id}":
+		controller.DeleteCategory(w, r)
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
