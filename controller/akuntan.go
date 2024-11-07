@@ -218,33 +218,52 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk menghapus produk berdasarkan ID
 func DeleteProduct(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan query parameter
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Product ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi productID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
-		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Produk tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Hapus produk dari MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = config.ProductCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	// Hapus data produk berdasarkan ID
+	filter := bson.M{"_id": objectID}
+	deleteResult, err := config.Mongoconn.Collection("products").DeleteOne(context.TODO(), filter)
 	if err != nil {
-		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus produk"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
+		return
+	}
+
+	// Periksa apakah ada produk yang dihapus
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Product deleted successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk berhasil dihapus",
+		"data":    deleteResult,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 
