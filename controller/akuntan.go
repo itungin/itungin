@@ -9,181 +9,261 @@ import (
 	"time"
 
 	"github.com/gocroot/config"
+	"github.com/gocroot/helper/at"
+	"github.com/gocroot/helper/atdb"
 	"github.com/gocroot/model"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-
 // Fungsi untuk menambahkan produk baru
 func CreateProduct(w http.ResponseWriter, r *http.Request) {
-	var newProduct model.Product // Model Produk
-	if err := json.NewDecoder(r.Body).Decode(&newProduct); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var product model.Product
+	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Set waktu pembuatan produk
-	newProduct.CreatedAt = time.Now()
+	// Inisialisasi data produk baru dengan ObjectID untuk ID
+	newProduct := model.Product{
+		ID:          primitive.NewObjectID(),
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Category:    product.Category,
+		Stock:       product.Stock,
+		CreatedAt:   time.Now(),
+	}
 
-	// Insert produk ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.ProductCollection.InsertOne(ctx, newProduct)
+	// Insert produk ke dalam MongoDB
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "products", newProduct)
 	if err != nil {
-		http.Error(w, "Failed to create product", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Product created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk berhasil ditambahkan",
+		"data":    newProduct,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
+
+
 
 // Fungsi untuk mendapatkan daftar produk
 func GetProducts(w http.ResponseWriter, r *http.Request) {
-	var products []model.Product
-
-	// Ambil data dari MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.ProductCollection.Find(ctx, bson.M{})
+	// Ambil semua data produk dari MongoDB
+	data, err := atdb.GetAllDoc[[]model.Product](config.Mongoconn, "products", primitive.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Data produk tidak ditemukan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var prod model.Product
-		if err := cursor.Decode(&prod); err != nil {
-			http.Error(w, "Error decoding product", http.StatusInternalServerError)
-			return
-		}
-		products = append(products, prod)
+	if len(data) == 0 {
+		var response model.Response
+		response.Status = "Error: Data produk kosong"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	// Format hasil sebagai slice of map dengan ID, Name, Description, Price, Stock, dan CreatedAt untuk setiap produk
+	var products []map[string]interface{}
+	for _, product := range data {
+		products = append(products, map[string]interface{}{
+			"id":          product.ID,
+			"name":        product.Name,
+			"description": product.Description,
+			"price":       product.Price,
+			"stock":       product.Stock,
+			"createdAt":   product.CreatedAt,
+		})
 	}
 
 	// Kirim data produk sebagai respon
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
+	at.WriteJSON(w, http.StatusOK, products)
 }
+
 
 // Fungsi untuk mendapatkan detail produk berdasarkan ID
 func GetProductByID(w http.ResponseWriter, r *http.Request) {
-    // Ambil parameter ID dari URL menggunakan query parameter
-    id := r.URL.Query().Get("id")
-    if id == "" {
-        http.Error(w, "Product ID is required", http.StatusBadRequest)
-        return
-    }
+	// Ambil parameter ID dari URL
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        http.Error(w, "Invalid product ID", http.StatusBadRequest)
-        return
-    }
+	objectID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    // Ambil produk dari MongoDB
-    var product model.Product
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	// Ambil produk dari MongoDB
+	var product model.Product
+	filter := bson.M{"_id": objectID}
+	err = config.Mongoconn.Collection("products").FindOne(context.TODO(), filter).Decode(&product)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
 
-    err = config.ProductCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&product)
-    if err != nil {
-        http.Error(w, "Product not found", http.StatusNotFound)
-        return
-    }
-
-    // Kirim produk sebagai respon
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(product)
+	// Kirim data produk sebagai respon
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk ditemukan",
+		"data":    product,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 
 // Fungsi untuk mengupdate produk berdasarkan ID
 func UpdateProduct(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan query parameter
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Product ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
-		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Produk tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	// Decode data produk yang akan diupdate
-	var updatedProduct model.Product
-	if err := json.NewDecoder(r.Body).Decode(&updatedProduct); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var requestBody struct {
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		Category    string  `json:"category"`
+		Stock       int     `json:"stock"`
+	}
+	err = json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal membaca data JSON"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Update produk di MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	update := bson.M{
-		"$set": bson.M{
-			"name":        updatedProduct.Name,
-			"description": updatedProduct.Description,
-			"price":       updatedProduct.Price,
-			"category":    updatedProduct.Category,
-			"stock":       updatedProduct.Stock,
-			"updatedAt":   time.Now(),
-		},
+	// Siapkan data untuk update
+	updateData := bson.M{}
+	if requestBody.Name != "" {
+		updateData["name"] = requestBody.Name
 	}
+	if requestBody.Description != "" {
+		updateData["description"] = requestBody.Description
+	}
+	if requestBody.Price != 0 {
+		updateData["price"] = requestBody.Price
+	}
+	if requestBody.Category != "" {
+		updateData["category"] = requestBody.Category
+	}
+	if requestBody.Stock != 0 {
+		updateData["stock"] = requestBody.Stock
+	}
+	updateData["updatedAt"] = time.Now()
 
-	_, err = config.ProductCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	// Update produk di MongoDB
+	filter := bson.M{"_id": objectID}
+	update := bson.M{"$set": updateData}
+	_, err = config.Mongoconn.Collection("products").UpdateOne(context.TODO(), filter, update)
 	if err != nil {
-		http.Error(w, "Failed to update product", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengupdate produk"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotModified, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Product updated successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk berhasil diupdate",
+		"data":    updateData,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
-
 
 
 
 // Fungsi untuk menghapus produk berdasarkan ID
 func DeleteProduct(w http.ResponseWriter, r *http.Request) {
-	// Ambil parameter ID dari URL menggunakan query parameter
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Product ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi productID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
-		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Produk tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Hapus produk dari MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = config.ProductCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	// Hapus data produk berdasarkan ID
+	filter := bson.M{"_id": objectID}
+	deleteResult, err := config.Mongoconn.Collection("products").DeleteOne(context.TODO(), filter)
 	if err != nil {
-		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus produk"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
+		return
+	}
+
+	// Periksa apakah ada produk yang dihapus
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Product deleted successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk berhasil dihapus",
+		"data":    deleteResult,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 
