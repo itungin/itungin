@@ -99,34 +99,43 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 
 // Fungsi untuk mendapatkan detail produk berdasarkan ID
 func GetProductByID(w http.ResponseWriter, r *http.Request) {
-    // Ambil parameter ID dari URL menggunakan query parameter
-    id := r.URL.Query().Get("id")
-    if id == "" {
-        http.Error(w, "Product ID is required", http.StatusBadRequest)
-        return
-    }
+	// Ambil parameter ID dari URL
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        http.Error(w, "Invalid product ID", http.StatusBadRequest)
-        return
-    }
+	objectID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID Produk tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    // Ambil produk dari MongoDB
-    var product model.Product
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	// Ambil produk dari MongoDB
+	var product model.Product
+	filter := bson.M{"_id": objectID}
+	err = config.Mongoconn.Collection("products").FindOne(context.TODO(), filter).Decode(&product)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Produk tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
 
-    err = config.ProductCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&product)
-    if err != nil {
-        http.Error(w, "Product not found", http.StatusNotFound)
-        return
-    }
-
-    // Kirim produk sebagai respon
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(product)
+	// Kirim data produk sebagai respon
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Produk ditemukan",
+		"data":    product,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 
