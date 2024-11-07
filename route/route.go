@@ -248,13 +248,13 @@ func URL(w http.ResponseWriter, r *http.Request) {
 			// Pelanggan
 	case method == "POST" && path == "/employee":
 		controller.CreateEmployee(w, r)
-	case method == "GET" && path == "/employee":
+	case method == "GET" && path == "/employees":
 		controller.GetEmployees(w, r)
-	case method == "GET" && path == "/employee/{id}":
+	case method == "GET" && path == "/employee":
 		controller.GetEmployeeByID(w, r)
-	case method == "PUT" && path == "/employee/{id}":
+	case method == "PUT" && path == "/employee":
 		controller.UpdateEmployee(w, r)
-	case method == "DELETE" && path == "/employee/{id}":
+	case method == "DELETE" && path == "/employee":
 		controller.DeleteEmployee(w, r)
 				// Produk
 	case method == "POST" && path == "/categories":
