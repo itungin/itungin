@@ -21,29 +21,50 @@ import (
 
 // Fungsi untuk menambahkan transaksi penjualan baru
 func CreateSalesTransaction(w http.ResponseWriter, r *http.Request) {
-	var newTransaction model.SalesTransaction
-	if err := json.NewDecoder(r.Body).Decode(&newTransaction); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+    var newTransaction model.SalesTransaction
+    if err := json.NewDecoder(r.Body).Decode(&newTransaction); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
 
-	// Set waktu transaksi
-	newTransaction.TransactionDate = time.Now()
+    // Set waktu transaksi
+    newTransaction.TransactionDate = time.Now()
 
-	// Insert transaksi ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+    // Insert transaksi ke MongoDB
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
 
-	_, err := config.SalesTransactionCollection.InsertOne(ctx, newTransaction)
-	if err != nil {
-		http.Error(w, "Failed to create sales transaction", http.StatusInternalServerError)
-		return
-	}
+    // Insert sales transaction
+    _, err := config.SalesTransactionCollection.InsertOne(ctx, newTransaction)
+    if err != nil {
+        http.Error(w, "Failed to create sales transaction", http.StatusInternalServerError)
+        return
+    }
 
-	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Sales transaction created successfully"})
+    // Update stok produk
+    for _, Product := range newTransaction.Products {
+        ID := Product.ID
+        Stock := Product.Stock
+
+        // Update stok produk
+        _, err := config.ProductCollection.UpdateOne(
+            ctx,
+            bson.M{"_id": ID},
+            bson.M{
+                "$inc": bson.M{"stock": -Stock}, // Kurangi stok
+            },
+        )
+        if err != nil {
+            http.Error(w, "Failed to update product stock", http.StatusInternalServerError)
+            return
+        }
+    }
+
+    // Kirim respon sukses
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(map[string]string{"message": "Sales transaction created successfully"})
 }
+
 
 // Fungsi untuk mendapatkan semua transaksi penjualan
 func GetSalesTransactions(w http.ResponseWriter, r *http.Request) {
