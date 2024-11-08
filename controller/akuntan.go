@@ -353,27 +353,47 @@ func formatStock(stock int) string {
 // controller pelanggan
 // CreateCustomer handles creating a new customer
 func CreateCustomer(w http.ResponseWriter, r *http.Request) {
-	var newCustomer model.Customer
-	if err := json.NewDecoder(r.Body).Decode(&newCustomer); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var customer model.Customer
+
+	// Decode data pelanggan dari body permintaan
+	if err := json.NewDecoder(r.Body).Decode(&customer); err != nil {
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	newCustomer.CreatedAt = time.Now()
-	newCustomer.UpdatedAt = time.Now()
+	// Inisialisasi data pelanggan baru dengan ObjectID untuk ID
+	newCustomer := model.Customer{
+		ID:        primitive.NewObjectID(),
+		Name:      customer.Name,
+		Email:     customer.Email,
+		Phone:     customer.Phone,
+		Address:   customer.Address,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.CustomerCollection.InsertOne(ctx, newCustomer)
+	// Insert pelanggan ke dalam MongoDB
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "customers", newCustomer)
 	if err != nil {
-		http.Error(w, "Failed to create customer", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Customer created successfully"})
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan berhasil ditambahkan",
+		"data":    newCustomer,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
+
 
 // GetCustomers handles retrieving all customers
 func GetCustomers(w http.ResponseWriter, r *http.Request) {
