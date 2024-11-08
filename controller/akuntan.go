@@ -476,53 +476,76 @@ func GetCustomerByID(w http.ResponseWriter, r *http.Request) {
 
 // UpdateCustomer handles updating a customer by ID
 func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
-	// Get the customer ID from URL query parameters
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	customerID := r.URL.Query().Get("id")
+	if customerID == "" {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Convert the string ID to ObjectID (assuming MongoDB)
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi ID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(customerID)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	var updatedCustomer model.Customer
-	// Decode the JSON body to the updatedCustomer struct
-	if err := json.NewDecoder(r.Body).Decode(&updatedCustomer); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	// Decode data pelanggan yang akan diupdate
+	var requestBody struct {
+		Name    string `json:"name"`
+		Email   string `json:"email"`
+		Phone   string `json:"phone"`
+		Address string `json:"address"`
 	}
-
-	// Context with a timeout for MongoDB operation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Update the customer fields in MongoDB
-	update := bson.M{
-		"$set": bson.M{
-			"name":      updatedCustomer.Name,
-			"email":     updatedCustomer.Email,
-			"phone":     updatedCustomer.Phone,
-			"address":   updatedCustomer.Address,
-			"updatedAt": time.Now(),
-		},
-	}
-
-	// Perform the update operation in MongoDB
-	_, err = config.CustomerCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	err = json.NewDecoder(r.Body).Decode(&requestBody)
 	if err != nil {
-		http.Error(w, "Failed to update customer", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal membaca data JSON"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Customer updated successfully"})
+	// Siapkan data untuk update
+	updateData := bson.M{}
+	if requestBody.Name != "" {
+		updateData["name"] = requestBody.Name
+	}
+	if requestBody.Email != "" {
+		updateData["email"] = requestBody.Email
+	}
+	if requestBody.Phone != "" {
+		updateData["phone"] = requestBody.Phone
+	}
+	if requestBody.Address != "" {
+		updateData["address"] = requestBody.Address
+	}
+	updateData["updatedAt"] = time.Now()
+
+	// Update pelanggan di MongoDB
+	filter := bson.M{"_id": objectID}
+	update := bson.M{"$set": updateData}
+	_, err = config.Mongoconn.Collection("customers").UpdateOne(context.TODO(), filter, update)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal mengupdate pelanggan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotModified, response)
+		return
+	}
+
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan berhasil diupdate",
+		"data":    updateData,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 // DeleteCustomer handles deleting a customer by ID
