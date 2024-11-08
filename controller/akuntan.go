@@ -276,9 +276,11 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cursor, err := config.ProductCollection.Find(ctx, bson.M{})
+	cursor, err := config.Mongoconn.Collection("products").Find(ctx, bson.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengambil data produk"
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -286,7 +288,9 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 	for cursor.Next(ctx) {
 		var prod model.Product
 		if err := cursor.Decode(&prod); err != nil {
-			http.Error(w, "Error decoding product", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal mendekode data produk"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 		products = append(products, prod)
@@ -303,7 +307,9 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 	// Tulis header CSV
 	headers := []string{"ID", "Name", "Price", "Category", "Description", "Stock", "Created At", "Updated At"}
 	if err := csvWriter.Write(headers); err != nil {
-		http.Error(w, "Failed to write CSV headers", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menulis header CSV"
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
@@ -312,19 +318,27 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 		row := []string{
 			product.ID.Hex(),
 			product.Name,
-			formatPrice(product.Price),       // Format harga
+			formatPrice(product.Price),        // Format harga
 			product.Category,
 			product.Description,
-			formatStock(product.Stock),       // Format stok
+			formatStock(product.Stock),        // Format stok
 			product.CreatedAt.Format(time.RFC3339),
 			product.UpdatedAt.Format(time.RFC3339),
 		}
 		if err := csvWriter.Write(row); err != nil {
-			http.Error(w, "Failed to write product data to CSV", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal menulis data produk ke CSV"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 	}
+
+	// Kirimkan respons sukses
+	var response model.Response
+	response.Status = "Success: Produk berhasil diekspor ke CSV"
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // Fungsi untuk format harga menjadi string
 func formatPrice(price float64) string {
