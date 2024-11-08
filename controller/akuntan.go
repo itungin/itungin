@@ -435,26 +435,44 @@ func GetCustomers(w http.ResponseWriter, r *http.Request) {
 
 // GetCustomerByID handles retrieving a customer by ID
 func GetCustomerByID(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	customerID := r.URL.Query().Get("id")
+	if customerID == "" {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
+	// Konversi ID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(customerID)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
+
+	// Ambil data pelanggan dari MongoDB
 	var customer model.Customer
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.CustomerCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&customer)
+	filter := bson.M{"_id": objectID}
+	err = config.Mongoconn.Collection("customers").FindOne(context.TODO(), filter).Decode(&customer)
 	if err != nil {
-		http.Error(w, "Customer not found", http.StatusNotFound)
+		var response model.Response
+		response.Status = "Error: Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customer)
+	// Kirim data pelanggan sebagai respon
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan ditemukan",
+		"data":    customer,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // UpdateCustomer handles updating a customer by ID
 func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
