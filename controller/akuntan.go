@@ -87,6 +87,7 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 			"name":        product.Name,
 			"description": product.Description,
 			"price":       product.Price,
+			"category":    product.Category,
 			"stock":       product.Stock,
 			"createdAt":   product.CreatedAt,
 		})
