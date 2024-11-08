@@ -550,35 +550,52 @@ func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 
 // DeleteCustomer handles deleting a customer by ID
 func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
-	// Get the customer ID from URL query parameters
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	customerID := r.URL.Query().Get("id")
+	if customerID == "" {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Convert the string ID to ObjectID (assuming MongoDB)
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi customerID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(customerID)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Context with a timeout for MongoDB operation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Delete the customer document from the database
-	_, err = config.CustomerCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	// Hapus data pelanggan berdasarkan ID
+	filter := bson.M{"_id": objectID}
+	deleteResult, err := config.CustomerCollection.DeleteOne(context.TODO(), filter)
 	if err != nil {
-		http.Error(w, "Failed to delete customer", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus pelanggan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted successfully"})
+	// Periksa apakah ada pelanggan yang dihapus
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan berhasil dihapus",
+		"data":    deleteResult,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 
