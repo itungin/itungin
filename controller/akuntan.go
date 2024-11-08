@@ -397,30 +397,41 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 
 // GetCustomers handles retrieving all customers
 func GetCustomers(w http.ResponseWriter, r *http.Request) {
-	var customers []model.Customer
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.CustomerCollection.Find(ctx, bson.M{})
+	// Ambil semua data pelanggan dari MongoDB
+	data, err := atdb.GetAllDoc[[]model.Customer](config.Mongoconn, "customers", primitive.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch customers", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Data pelanggan tidak ditemukan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var cust model.Customer
-		if err := cursor.Decode(&cust); err != nil {
-			http.Error(w, "Error decoding customer", http.StatusInternalServerError)
-			return
-		}
-		customers = append(customers, cust)
+	if len(data) == 0 {
+		var response model.Response
+		response.Status = "Error: Data pelanggan kosong"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customers)
+	// Format hasil sebagai slice of map dengan ID, Name, Email, Phone, Address, CreatedAt, dan UpdatedAt untuk setiap pelanggan
+	var customers []map[string]interface{}
+	for _, customer := range data {
+		customers = append(customers, map[string]interface{}{
+			"id":        customer.ID,
+			"name":      customer.Name,
+			"email":     customer.Email,
+			"phone":     customer.Phone,
+			"address":   customer.Address,
+			"createdAt": customer.CreatedAt,
+			"updatedAt": customer.UpdatedAt,
+		})
+	}
+
+	// Kirim data pelanggan sebagai respon
+	at.WriteJSON(w, http.StatusOK, customers)
 }
+
 
 // GetCustomerByID handles retrieving a customer by ID
 func GetCustomerByID(w http.ResponseWriter, r *http.Request) {
