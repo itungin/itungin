@@ -711,59 +711,86 @@ func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
 
 // Handler untuk mendapatkan semua laporan keuangan
 func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
-	var reports []model.LaporanAkuntan
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.ReportCollection.Find(ctx, bson.M{})
+	// Ambil semua data laporan keuangan dari MongoDB
+	data, err := atdb.GetAllDoc[[]model.LaporanAkuntan](config.Mongoconn, "financial_reports", primitive.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch financial reports", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Data laporan keuangan tidak ditemukan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var rep model.LaporanAkuntan
-		if err := cursor.Decode(&rep); err != nil {
-			http.Error(w, "Error decoding financial report", http.StatusInternalServerError)
-			return
-		}
-		reports = append(reports, rep)
+	if len(data) == 0 {
+		var response model.Response
+		response.Status = "Error: Data laporan keuangan kosong"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reports)
+	// Format hasil sebagai slice of map dengan ID, StartDate, EndDate, Income, Expenses, Profit, CreatedAt
+	var reports []map[string]interface{}
+	for _, report := range data {
+		reports = append(reports, map[string]interface{}{
+			"id":             report.ID,
+			"startDate":      report.StartDate,
+			"endDate":        report.EndDate,
+			"income":         report.Income,
+			"expenses":       report.Expenses,
+			"profit":         report.Profit,
+			"createdAt":      report.CreatedAt,
+		})
+	}
+
+	// Kirim data laporan keuangan sebagai respon
+	at.WriteJSON(w, http.StatusOK, reports)
 }
+
 
 // Fungsi untuk menghapus laporan keuangan berdasarkan ID
 func DeleteFinancialReport(w http.ResponseWriter, r *http.Request) {
-	// Get the report ID from URL query parameters
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Report ID is required", http.StatusBadRequest)
+	// Ambil parameter ID laporan dari URL
+	reportID := r.URL.Query().Get("id")
+	if reportID == "" {
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Convert the string ID to ObjectID (assuming MongoDB)
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi reportID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(reportID)
 	if err != nil {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Context with a timeout for MongoDB operation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Delete the report document from the database
-	_, err = config.ReportCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	// Hapus data laporan keuangan berdasarkan ID menggunakan atdb.DeleteOneDoc
+	deleteResult, err := atdb.DeleteOneDoc(config.Mongoconn, "financial_reports", bson.M{"_id": objectID})
 	if err != nil {
-		http.Error(w, "Failed to delete financial report", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus laporan keuangan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report deleted successfully"})
+	// Periksa apakah ada laporan yang dihapus
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Laporan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Laporan keuangan berhasil dihapus",
+		"data":    deleteResult,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
