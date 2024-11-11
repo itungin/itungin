@@ -634,13 +634,16 @@ func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Inisialisasi data laporan baru dengan ObjectID untuk ID
+	// Inisialisasi data laporan baru dengan ObjectID untuk ID dan mengisi income, expenses, profit
 	newReport := model.LaporanAkuntan{
 		ID:             primitive.NewObjectID(),
 		StartDate:      report.StartDate,
 		EndDate:        report.EndDate,
 		StartDateTime:  startDate,
 		EndDateTime:    endDate,
+		Income:         report.Income,  // Pastikan income dikirim dalam JSON
+		Expenses:       report.Expenses, // Pastikan expenses dikirim dalam JSON
+		Profit:         report.Profit, // Pastikan profit dikirim dalam JSON
 		CreatedAt:      time.Now(),
 	}
 
@@ -664,28 +667,47 @@ func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
 }
 
 
+
 // Fungsi untuk mendapatkan laporan keuangan berdasarkan ID
 func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	reportID := r.URL.Query().Get("id")
+	if reportID == "" {
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
+	// Konversi ID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(reportID)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
+
+	// Ambil data laporan keuangan dari MongoDB
 	var report model.LaporanAkuntan
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.ReportCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&report)
+	filter := bson.M{"_id": objectID}
+	err = config.Mongoconn.Collection("financial_reports").FindOne(context.TODO(), filter).Decode(&report)
 	if err != nil {
-		http.Error(w, "Financial report not found", http.StatusNotFound)
+		var response model.Response
+		response.Status = "Error: Laporan keuangan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(report)
+	// Kirim data laporan sebagai respon
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Laporan keuangan ditemukan",
+		"data":    report,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // Handler untuk mendapatkan semua laporan keuangan
 func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
