@@ -571,7 +571,7 @@ func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 
 	// Hapus data pelanggan berdasarkan ID
 	filter := bson.M{"_id": objectID}
-	deleteResult, err := config.CustomerCollection.DeleteOne(context.TODO(), filter)
+	deleteResult, err := config.Mongoconn.Collection("customers").DeleteOne(context.TODO(), filter)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal menghapus pelanggan"
@@ -601,49 +601,68 @@ func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 
 
 
+
 // Handler Laporan
 // Handler untuk membuat laporan keuangan
 func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
-	var newReport model.LaporanAkuntan
+	var report model.LaporanAkuntan
 
-	// Decode JSON request body
-	if err := json.NewDecoder(r.Body).Decode(&newReport); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Decode data laporan dari body permintaan
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	// Parse tanggal dari string ke time.Time
-	startDate, err := time.Parse("2006-01-02", newReport.StartDate) // Mengambil dari objek
+	startDate, err := time.Parse("2006-01-02", report.StartDate)
 	if err != nil {
-		http.Error(w, "Invalid start date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Invalid start date format. Use YYYY-MM-DD"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
-	endDate, err := time.Parse("2006-01-02", newReport.EndDate) // Mengambil dari objek
+	endDate, err := time.Parse("2006-01-02", report.EndDate)
 	if err != nil {
-		http.Error(w, "Invalid end date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Invalid end date format. Use YYYY-MM-DD"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Set waktu pembuatan
-	newReport.StartDateTime = startDate // Pastikan field ini ada di model
-	newReport.EndDateTime = endDate     // Pastikan field ini ada di model
-	newReport.CreatedAt = time.Now()
+	// Inisialisasi data laporan baru dengan ObjectID untuk ID
+	newReport := model.LaporanAkuntan{
+		ID:             primitive.NewObjectID(),
+		StartDate:      report.StartDate,
+		EndDate:        report.EndDate,
+		StartDateTime:  startDate,
+		EndDateTime:    endDate,
+		CreatedAt:      time.Now(),
+	}
 
-	// Simpan ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	newReport.ID = primitive.NewObjectID()
-	_, err = config.ReportCollection.InsertOne(ctx, newReport)
+	// Insert laporan ke dalam MongoDB
+	_, err = atdb.InsertOneDoc(config.Mongoconn, "financial_reports", newReport)
 	if err != nil {
-		http.Error(w, "Failed to create financial report", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Laporan keuangan berhasil dibuat",
+		"data":    newReport,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
+
 
 // Fungsi untuk mendapatkan laporan keuangan berdasarkan ID
 func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
