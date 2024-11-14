@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
+	"github.com/gocroot/helper/at"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -16,7 +17,10 @@ import (
 func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	var newCategory model.Category
 	if err := json.NewDecoder(r.Body).Decode(&newCategory); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
@@ -24,18 +28,22 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	newCategory.CreatedAt = time.Now()
 
 	// Insert kategori ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.CategoryCollection.InsertOne(ctx, newCategory)
+	_, err := config.CategoryCollection.InsertOne(context.Background(), newCategory)
 	if err != nil {
-		http.Error(w, "Failed to create category", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Category created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori berhasil dibuat",
+		"data":    newCategory,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
 
 // Fungsi untuk mendapatkan daftar kategori
@@ -43,122 +51,154 @@ func GetCategories(w http.ResponseWriter, r *http.Request) {
 	var categories []model.Category
 
 	// Ambil data dari MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.CategoryCollection.Find(ctx, bson.M{})
+	cursor, err := config.CategoryCollection.Find(context.Background(), bson.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch categories", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengambil data kategori"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
-	defer cursor.Close(ctx)
+	defer cursor.Close(context.Background())
 
-	for cursor.Next(ctx) {
+	// Decode hasil pencarian kategori
+	for cursor.Next(context.Background()) {
 		var category model.Category
 		if err := cursor.Decode(&category); err != nil {
-			http.Error(w, "Error decoding category", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal mendekode kategori"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 		categories = append(categories, category)
 	}
 
 	// Kirim data kategori sebagai respon
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(categories)
+	at.WriteJSON(w, http.StatusOK, categories)
 }
 
 // Fungsi untuk mendapatkan detail kategori berdasarkan ID
 func GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	var category model.Category
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.CategoryCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&category)
+	err = config.CategoryCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&category)
 	if err != nil {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		var response model.Response
+		response.Status = "Error: Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(category)
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori ditemukan",
+		"data":    category,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
 
 // Fungsi untuk mengupdate kategori berdasarkan ID
 func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	var updatedCategory model.Category
 	if err := json.NewDecoder(r.Body).Decode(&updatedCategory); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Gagal membaca data JSON"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	update := bson.M{
-		"$set": bson.M{
-			"name":        updatedCategory.Name,
-			"description": updatedCategory.Description,
-			"updatedAt":   time.Now(),
-		},
+	updateData := bson.M{
+		"name":        updatedCategory.Name,
+		"description": updatedCategory.Description,
+		"updatedAt":   time.Now(),
 	}
 
-	_, err = config.CategoryCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	_, err = config.CategoryCollection.UpdateOne(context.Background(), bson.M{"_id": objectID}, bson.M{"$set": updateData})
 	if err != nil {
-		http.Error(w, "Failed to update category", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengupdate kategori"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Category updated successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori berhasil diupdate",
+		"data":    updateData,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // Fungsi untuk menghapus kategori berdasarkan ID
 func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = config.CategoryCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	deleteResult, err := config.CategoryCollection.DeleteOne(context.Background(), bson.M{"_id": objectID})
 	if err != nil {
-		http.Error(w, "Failed to delete category", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus kategori"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Category deleted successfully"})
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori berhasil dihapus",
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
