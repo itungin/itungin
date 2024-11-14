@@ -51,28 +51,30 @@ func GetCategories(w http.ResponseWriter, r *http.Request) {
 	var categories []model.Category
 
 	// Ambil data dari MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.CategoryCollection.Find(ctx, bson.M{})
+	cursor, err := config.CategoryCollection.Find(context.Background(), bson.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch categories", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengambil data kategori"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
-	defer cursor.Close(ctx)
+	defer cursor.Close(context.Background())
 
-	for cursor.Next(ctx) {
+	// Decode hasil pencarian kategori
+	for cursor.Next(context.Background()) {
 		var category model.Category
 		if err := cursor.Decode(&category); err != nil {
-			http.Error(w, "Error decoding category", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal mendekode kategori"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 		categories = append(categories, category)
 	}
 
 	// Kirim data kategori sebagai respon
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(categories)
+	at.WriteJSON(w, http.StatusOK, categories)
 }
 
 // Fungsi untuk mendapatkan detail kategori berdasarkan ID
