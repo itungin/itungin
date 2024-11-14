@@ -59,7 +59,10 @@ func GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 	cursor, err := config.EmployeeCollection.Find(ctx, bson.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch employees", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengambil data employees"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -67,15 +70,18 @@ func GetEmployees(w http.ResponseWriter, r *http.Request) {
 	for cursor.Next(ctx) {
 		var emp model.Employee
 		if err := cursor.Decode(&emp); err != nil {
-			http.Error(w, "Error decoding employee", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal mendekode employee"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 		employees = append(employees, emp)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(employees)
+	at.WriteJSON(w, http.StatusOK, employees)
 }
+
+
 
 // GetEmployeeByID retrieves an employee by ID
 func GetEmployeeByID(w http.ResponseWriter, r *http.Request) {
