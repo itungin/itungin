@@ -85,32 +85,40 @@ func GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 // GetEmployeeByID retrieves an employee by ID
 func GetEmployeeByID(w http.ResponseWriter, r *http.Request) {
-    // Mengambil ID dari query parameter
-    id := r.URL.Query().Get("id")
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		var response model.Response
+		response.Status = "Error: ID tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    if id == "" {
-        http.Error(w, "ID is required", http.StatusBadRequest)
-        return
-    }
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        http.Error(w, "Invalid employee ID", http.StatusBadRequest)
-        return
-    }
+	var employee model.Employee
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-    var employee model.Employee
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	err = config.EmployeeCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&employee)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Employee tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
 
-    err = config.EmployeeCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&employee)
-    if err != nil {
-        http.Error(w, "Employee not found", http.StatusNotFound)
-        return
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(employee)
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Employee ditemukan",
+		"data":    employee,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
 
 // UpdateEmployee updates an employee by ID
