@@ -376,7 +376,7 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert pelanggan ke dalam MongoDB
-	_, err := atdb.InsertOneDoc(config.Mongoconn, "pelanggan", newCustomer)
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "customers", newCustomer)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal Insert Database"
