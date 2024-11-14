@@ -123,47 +123,59 @@ func GetEmployeeByID(w http.ResponseWriter, r *http.Request) {
 
 // UpdateEmployee updates an employee by ID
 func UpdateEmployee(w http.ResponseWriter, r *http.Request) {
-    // Mengambil ID dari query parameter
-    id := r.URL.Query().Get("id")
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		var response model.Response
+		response.Status = "Error: ID tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    if id == "" {
-        http.Error(w, "ID is required", http.StatusBadRequest)
-        return
-    }
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        http.Error(w, "Invalid employee ID", http.StatusBadRequest)
-        return
-    }
+	var updatedEmployee model.Employee
+	if err := json.NewDecoder(r.Body).Decode(&updatedEmployee); err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal membaca data JSON"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    var updatedEmployee model.Employee
-    if err := json.NewDecoder(r.Body).Decode(&updatedEmployee); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
+	update := bson.M{
+		"$set": bson.M{
+			"name":         updatedEmployee.Name,
+			"email":        updatedEmployee.Email,
+			"phone_number": updatedEmployee.PhoneNumber,
+			"position":     updatedEmployee.Position,
+			"updated_at":   time.Now(),
+		},
+	}
 
-    update := bson.M{
-        "$set": bson.M{
-            "name":         updatedEmployee.Name,
-            "email":        updatedEmployee.Email,
-            "phone_number": updatedEmployee.PhoneNumber,
-            "position":     updatedEmployee.Position,
-            "updated_at":   time.Now(),
-        },
-    }
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	_, err = config.EmployeeCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal mengupdate employee"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
+		return
+	}
 
-    _, err = config.EmployeeCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
-    if err != nil {
-        http.Error(w, "Failed to update employee", http.StatusInternalServerError)
-        return
-    }
-
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(map[string]string{"message": "Employee updated successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Employee updated successfully",
+		"data":    update,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
 
 // DeleteEmployee deletes an employee by ID
