@@ -166,25 +166,39 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = config.CategoryCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	deleteResult, err := config.CategoryCollection.DeleteOne(context.Background(), bson.M{"_id": objectID})
 	if err != nil {
-		http.Error(w, "Failed to delete category", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus kategori"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Category deleted successfully"})
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori berhasil dihapus",
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
