@@ -16,7 +16,10 @@ import (
 func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	var newCategory model.Category
 	if err := json.NewDecoder(r.Body).Decode(&newCategory); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
@@ -24,18 +27,22 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	newCategory.CreatedAt = time.Now()
 
 	// Insert kategori ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.CategoryCollection.InsertOne(ctx, newCategory)
+	_, err := config.CategoryCollection.InsertOne(context.Background(), newCategory)
 	if err != nil {
-		http.Error(w, "Failed to create category", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Category created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori berhasil dibuat",
+		"data":    newCategory,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
 
 // Fungsi untuk mendapatkan daftar kategori
