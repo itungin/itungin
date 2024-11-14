@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"log"
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
@@ -67,31 +68,38 @@ func GetExpenses(w http.ResponseWriter, r *http.Request) {
 
 // GetExpenseByID mengambil transaksi pengeluaran berdasarkan ID dari query parameter
 func GetExpenseByID(w http.ResponseWriter, r *http.Request) {
+	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "ID parameter is required", http.StatusBadRequest)
+		http.Error(w, "Sales transaction ID is required", http.StatusBadRequest)
 		return
 	}
 
+	log.Println("ID received:", id) // Tambahkan log untuk debugging
+
+	// Konversi ID dari string ke ObjectID
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, "Invalid expense transaction ID", http.StatusBadRequest)
+		http.Error(w, "Invalid sales transaction ID", http.StatusBadRequest)
 		return
 	}
 
-	var expense model.ExpenseTransaction
+	// Ambil transaksi dari MongoDB
+	var transaction model.SalesTransaction
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = config.ExpenseTransactionCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&expense)
+	err = config.SalesTransactionCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&transaction)
 	if err != nil {
-		http.Error(w, "Expense transaction not found", http.StatusNotFound)
+		http.Error(w, "Sales transaction not found", http.StatusNotFound)
 		return
 	}
 
+	// Kirim transaksi sebagai respon
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(expense)
+	json.NewEncoder(w).Encode(transaction)
 }
+
 
 // UpdateExpense mengupdate transaksi pengeluaran berdasarkan ID dari query parameter
 func UpdateExpense(w http.ResponseWriter, r *http.Request) {

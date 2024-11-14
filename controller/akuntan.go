@@ -87,6 +87,7 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 			"name":        product.Name,
 			"description": product.Description,
 			"price":       product.Price,
+			"category":    product.Category,
 			"stock":       product.Stock,
 			"createdAt":   product.CreatedAt,
 		})
@@ -275,9 +276,11 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cursor, err := config.ProductCollection.Find(ctx, bson.M{})
+	cursor, err := config.Mongoconn.Collection("products").Find(ctx, bson.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal mengambil data produk"
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 	defer cursor.Close(ctx)
@@ -285,7 +288,9 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 	for cursor.Next(ctx) {
 		var prod model.Product
 		if err := cursor.Decode(&prod); err != nil {
-			http.Error(w, "Error decoding product", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal mendekode data produk"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 		products = append(products, prod)
@@ -302,7 +307,9 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 	// Tulis header CSV
 	headers := []string{"ID", "Name", "Price", "Category", "Description", "Stock", "Created At", "Updated At"}
 	if err := csvWriter.Write(headers); err != nil {
-		http.Error(w, "Failed to write CSV headers", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menulis header CSV"
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
@@ -311,19 +318,27 @@ func ExportProductsToCSV(w http.ResponseWriter, r *http.Request) {
 		row := []string{
 			product.ID.Hex(),
 			product.Name,
-			formatPrice(product.Price),       // Format harga
+			formatPrice(product.Price),        // Format harga
 			product.Category,
 			product.Description,
-			formatStock(product.Stock),       // Format stok
+			formatStock(product.Stock),        // Format stok
 			product.CreatedAt.Format(time.RFC3339),
 			product.UpdatedAt.Format(time.RFC3339),
 		}
 		if err := csvWriter.Write(row); err != nil {
-			http.Error(w, "Failed to write product data to CSV", http.StatusInternalServerError)
+			var response model.Response
+			response.Status = "Error: Gagal menulis data produk ke CSV"
+			at.WriteJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 	}
+
+	// Kirimkan respons sukses
+	var response model.Response
+	response.Status = "Success: Produk berhasil diekspor ke CSV"
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // Fungsi untuk format harga menjadi string
 func formatPrice(price float64) string {
@@ -338,160 +353,251 @@ func formatStock(stock int) string {
 // controller pelanggan
 // CreateCustomer handles creating a new customer
 func CreateCustomer(w http.ResponseWriter, r *http.Request) {
-	var newCustomer model.Customer
-	if err := json.NewDecoder(r.Body).Decode(&newCustomer); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var customer model.Customer
+
+	// Decode data pelanggan dari body permintaan
+	if err := json.NewDecoder(r.Body).Decode(&customer); err != nil {
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	newCustomer.CreatedAt = time.Now()
-	newCustomer.UpdatedAt = time.Now()
+	// Inisialisasi data pelanggan baru dengan ObjectID untuk ID
+	newCustomer := model.Customer{
+		ID:        primitive.NewObjectID(),
+		Name:      customer.Name,
+		Email:     customer.Email,
+		Phone:     customer.Phone,
+		Address:   customer.Address,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.CustomerCollection.InsertOne(ctx, newCustomer)
+	// Insert pelanggan ke dalam MongoDB
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "pelanggan", newCustomer)
 	if err != nil {
-		http.Error(w, "Failed to create customer", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Customer created successfully"})
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan berhasil ditambahkan",
+		"data":    newCustomer,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
+
 
 // GetCustomers handles retrieving all customers
 func GetCustomers(w http.ResponseWriter, r *http.Request) {
-	var customers []model.Customer
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.CustomerCollection.Find(ctx, bson.M{})
+	// Ambil semua data pelanggan dari MongoDB
+	data, err := atdb.GetAllDoc[[]model.Customer](config.Mongoconn, "pelanggan", primitive.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch customers", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Data pelanggan tidak ditemukan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var cust model.Customer
-		if err := cursor.Decode(&cust); err != nil {
-			http.Error(w, "Error decoding customer", http.StatusInternalServerError)
-			return
-		}
-		customers = append(customers, cust)
+	if len(data) == 0 {
+		var response model.Response
+		response.Status = "Error: Data pelanggan kosong"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customers)
+	// Format hasil sebagai slice of map dengan ID, Name, Email, Phone, Address, CreatedAt, dan UpdatedAt untuk setiap pelanggan
+	var customers []map[string]interface{}
+	for _, customer := range data {
+		customers = append(customers, map[string]interface{}{
+			"id":        customer.ID,
+			"name":      customer.Name,
+			"email":     customer.Email,
+			"phone":     customer.Phone,
+			"address":   customer.Address,
+			"createdAt": customer.CreatedAt,
+			"updatedAt": customer.UpdatedAt,
+		})
+	}
+
+	// Kirim data pelanggan sebagai respon
+	at.WriteJSON(w, http.StatusOK, customers)
 }
+
+
 
 // GetCustomerByID handles retrieving a customer by ID
 func GetCustomerByID(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	customerID := r.URL.Query().Get("id")
+	if customerID == "" {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
+	// Konversi ID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(customerID)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
+
+	// Ambil data pelanggan dari MongoDB
 	var customer model.Customer
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.CustomerCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&customer)
+	filter := bson.M{"_id": objectID}
+	err = config.Mongoconn.Collection("pelanggan").FindOne(context.TODO(), filter).Decode(&customer)
 	if err != nil {
-		http.Error(w, "Customer not found", http.StatusNotFound)
+		var response model.Response
+		response.Status = "Error: Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customer)
+	// Kirim data pelanggan sebagai respon
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan ditemukan",
+		"data":    customer,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // UpdateCustomer handles updating a customer by ID
 func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
-	// Get the customer ID from URL query parameters
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	customerID := r.URL.Query().Get("id")
+	if customerID == "" {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Convert the string ID to ObjectID (assuming MongoDB)
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi ID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(customerID)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	var updatedCustomer model.Customer
-	// Decode the JSON body to the updatedCustomer struct
-	if err := json.NewDecoder(r.Body).Decode(&updatedCustomer); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	// Decode data pelanggan yang akan diupdate
+	var requestBody struct {
+		Name    string `json:"name"`
+		Email   string `json:"email"`
+		Phone   string `json:"phone"`
+		Address string `json:"address"`
 	}
-
-	// Context with a timeout for MongoDB operation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Update the customer fields in MongoDB
-	update := bson.M{
-		"$set": bson.M{
-			"name":      updatedCustomer.Name,
-			"email":     updatedCustomer.Email,
-			"phone":     updatedCustomer.Phone,
-			"address":   updatedCustomer.Address,
-			"updatedAt": time.Now(),
-		},
-	}
-
-	// Perform the update operation in MongoDB
-	_, err = config.CustomerCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	err = json.NewDecoder(r.Body).Decode(&requestBody)
 	if err != nil {
-		http.Error(w, "Failed to update customer", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal membaca data JSON"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Customer updated successfully"})
+	// Siapkan data untuk update
+	updateData := bson.M{}
+	if requestBody.Name != "" {
+		updateData["name"] = requestBody.Name
+	}
+	if requestBody.Email != "" {
+		updateData["email"] = requestBody.Email
+	}
+	if requestBody.Phone != "" {
+		updateData["phone"] = requestBody.Phone
+	}
+	if requestBody.Address != "" {
+		updateData["address"] = requestBody.Address
+	}
+	updateData["updatedAt"] = time.Now()
+
+	// Update pelanggan di MongoDB
+	filter := bson.M{"_id": objectID}
+	update := bson.M{"$set": updateData}
+	_, err = config.Mongoconn.Collection("pelanggan").UpdateOne(context.TODO(), filter, update)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal mengupdate pelanggan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotModified, response)
+		return
+	}
+
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan berhasil diupdate",
+		"data":    updateData,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 
 // DeleteCustomer handles deleting a customer by ID
 func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
-	// Get the customer ID from URL query parameters
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	customerID := r.URL.Query().Get("id")
+	if customerID == "" {
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Convert the string ID to ObjectID (assuming MongoDB)
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi customerID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(customerID)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Pelanggan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Context with a timeout for MongoDB operation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Delete the customer document from the database
-	_, err = config.CustomerCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	// Hapus data pelanggan berdasarkan ID
+	filter := bson.M{"_id": objectID}
+	deleteResult, err := config.Mongoconn.Collection("pelanggan").DeleteOne(context.TODO(), filter)
 	if err != nil {
-		http.Error(w, "Failed to delete customer", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus pelanggan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted successfully"})
+	// Periksa apakah ada pelanggan yang dihapus
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Pelanggan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Pelanggan berhasil dihapus",
+		"data":    deleteResult,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
+
 
 
 
@@ -499,125 +605,192 @@ func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 // Handler Laporan
 // Handler untuk membuat laporan keuangan
 func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
-	var newReport model.LaporanAkuntan
+	var report model.LaporanAkuntan
 
-	// Decode JSON request body
-	if err := json.NewDecoder(r.Body).Decode(&newReport); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Decode data laporan dari body permintaan
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	// Parse tanggal dari string ke time.Time
-	startDate, err := time.Parse("2006-01-02", newReport.StartDate) // Mengambil dari objek
+	startDate, err := time.Parse("2006-01-02", report.StartDate)
 	if err != nil {
-		http.Error(w, "Invalid start date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Invalid start date format. Use YYYY-MM-DD"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
-	endDate, err := time.Parse("2006-01-02", newReport.EndDate) // Mengambil dari objek
+	endDate, err := time.Parse("2006-01-02", report.EndDate)
 	if err != nil {
-		http.Error(w, "Invalid end date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Invalid end date format. Use YYYY-MM-DD"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Set waktu pembuatan
-	newReport.StartDateTime = startDate // Pastikan field ini ada di model
-	newReport.EndDateTime = endDate     // Pastikan field ini ada di model
-	newReport.CreatedAt = time.Now()
+	// Inisialisasi data laporan baru dengan ObjectID untuk ID dan mengisi income, expenses, profit
+	newReport := model.LaporanAkuntan{
+		ID:             primitive.NewObjectID(),
+		StartDate:      report.StartDate,
+		EndDate:        report.EndDate,
+		StartDateTime:  startDate,
+		EndDateTime:    endDate,
+		Income:         report.Income,  // Pastikan income dikirim dalam JSON
+		Expenses:       report.Expenses, // Pastikan expenses dikirim dalam JSON
+		Profit:         report.Profit, // Pastikan profit dikirim dalam JSON
+		CreatedAt:      time.Now(),
+	}
 
-	// Simpan ke MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	newReport.ID = primitive.NewObjectID()
-	_, err = config.ReportCollection.InsertOne(ctx, newReport)
+	// Insert laporan ke dalam MongoDB
+	_, err = atdb.InsertOneDoc(config.Mongoconn, "laporan", newReport)
 	if err != nil {
-		http.Error(w, "Failed to create financial report", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal Insert Database"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
 	// Kirim respon sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Laporan keuangan berhasil dibuat",
+		"data":    newReport,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
+
+
 
 // Fungsi untuk mendapatkan laporan keuangan berdasarkan ID
 func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+	// Ambil parameter ID dari URL
+	reportID := r.URL.Query().Get("id")
+	if reportID == "" {
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
+	// Konversi ID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(reportID)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
+
+	// Ambil data laporan keuangan dari MongoDB
 	var report model.LaporanAkuntan
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.ReportCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&report)
+	filter := bson.M{"_id": objectID}
+	err = config.Mongoconn.Collection("laporan").FindOne(context.TODO(), filter).Decode(&report)
 	if err != nil {
-		http.Error(w, "Financial report not found", http.StatusNotFound)
+		var response model.Response
+		response.Status = "Error: Laporan keuangan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(report)
+	// Kirim data laporan sebagai respon
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Laporan keuangan ditemukan",
+		"data":    report,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
 
 // Handler untuk mendapatkan semua laporan keuangan
 func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
-	var reports []model.LaporanAkuntan
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.ReportCollection.Find(ctx, bson.M{})
+	// Ambil semua data laporan keuangan dari MongoDB
+	data, err := atdb.GetAllDoc[[]model.LaporanAkuntan](config.Mongoconn, "laporan", primitive.M{})
 	if err != nil {
-		http.Error(w, "Failed to fetch financial reports", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Data laporan keuangan tidak ditemukan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var rep model.LaporanAkuntan
-		if err := cursor.Decode(&rep); err != nil {
-			http.Error(w, "Error decoding financial report", http.StatusInternalServerError)
-			return
-		}
-		reports = append(reports, rep)
+	if len(data) == 0 {
+		var response model.Response
+		response.Status = "Error: Data laporan keuangan kosong"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reports)
+	// Format hasil sebagai slice of map dengan ID, StartDate, EndDate, Income, Expenses, Profit, CreatedAt
+	var reports []map[string]interface{}
+	for _, report := range data {
+		reports = append(reports, map[string]interface{}{
+			"id":             report.ID,
+			"startDate":      report.StartDate,
+			"endDate":        report.EndDate,
+			"income":         report.Income,
+			"expenses":       report.Expenses,
+			"profit":         report.Profit,
+			"createdAt":      report.CreatedAt,
+		})
+	}
+
+	// Kirim data laporan keuangan sebagai respon
+	at.WriteJSON(w, http.StatusOK, reports)
 }
+
 
 // Fungsi untuk menghapus laporan keuangan berdasarkan ID
 func DeleteFinancialReport(w http.ResponseWriter, r *http.Request) {
-	// Get the report ID from URL query parameters
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Report ID is required", http.StatusBadRequest)
+	// Ambil parameter ID laporan dari URL
+	reportID := r.URL.Query().Get("id")
+	if reportID == "" {
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Convert the string ID to ObjectID (assuming MongoDB)
-	objectID, err := primitive.ObjectIDFromHex(id)
+	// Konversi reportID dari string ke ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(reportID)
 	if err != nil {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Laporan tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Context with a timeout for MongoDB operation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Delete the report document from the database
-	_, err = config.ReportCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	// Hapus data laporan keuangan berdasarkan ID menggunakan atdb.DeleteOneDoc
+	deleteResult, err := atdb.DeleteOneDoc(config.Mongoconn, "laporan", bson.M{"_id": objectID})
 	if err != nil {
-		http.Error(w, "Failed to delete financial report", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal menghapus laporan keuangan"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Financial report deleted successfully"})
+	// Periksa apakah ada laporan yang dihapus
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Laporan tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
+
+	// Kirim respon sukses
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Laporan keuangan berhasil dihapus",
+		"data":    deleteResult,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
+
