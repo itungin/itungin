@@ -81,28 +81,35 @@ func GetCategories(w http.ResponseWriter, r *http.Request) {
 func GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Category ID is required", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: ID Kategori tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
 	var category model.Category
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.CategoryCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&category)
+	err = config.CategoryCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&category)
 	if err != nil {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		var response model.Response
+		response.Status = "Error: Kategori tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(category)
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Kategori ditemukan",
+		"data":    category,
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
 
 // Fungsi untuk mengupdate kategori berdasarkan ID
