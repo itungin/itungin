@@ -180,29 +180,44 @@ func UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 
 // DeleteEmployee deletes an employee by ID
 func DeleteEmployee(w http.ResponseWriter, r *http.Request) {
-    // Mengambil ID dari query parameter
-    id := r.URL.Query().Get("id")
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		var response model.Response
+		response.Status = "Error: ID tidak ditemukan"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    if id == "" {
-        http.Error(w, "ID is required", http.StatusBadRequest)
-        return
-    }
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: ID tidak valid"
+		at.WriteJSON(w, http.StatusBadRequest, response)
+		return
+	}
 
-    objectID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        http.Error(w, "Invalid employee ID", http.StatusBadRequest)
-        return
-    }
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	deleteResult, err := config.EmployeeCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	if err != nil {
+		var response model.Response
+		response.Status = "Error: Gagal menghapus employee"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
+		return
+	}
 
-    _, err = config.EmployeeCollection.DeleteOne(ctx, bson.M{"_id": objectID})
-    if err != nil {
-        http.Error(w, "Failed to delete employee", http.StatusInternalServerError)
-        return
-    }
+	if deleteResult.DeletedCount == 0 {
+		var response model.Response
+		response.Status = "Error: Employee tidak ditemukan"
+		at.WriteJSON(w, http.StatusNotFound, response)
+		return
+	}
 
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(map[string]string{"message": "Employee deleted successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Employee deleted successfully",
+	}
+	at.WriteJSON(w, http.StatusOK, response)
 }
