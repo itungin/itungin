@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
+    "github.com/gocroot/helper/at"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,11 +18,13 @@ import (
 func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 	var newEmployee model.Employee
 	if err := json.NewDecoder(r.Body).Decode(&newEmployee); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		var response model.Response
+		response.Status = "Error: Bad Request"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusBadRequest, response)
 		return
 	}
 
-	// Mengatur ID otomatis dan timestamps
 	newEmployee.ID = primitive.NewObjectID()
 	newEmployee.CreatedAt = time.Now()
 	newEmployee.UpdatedAt = time.Now()
@@ -31,12 +34,19 @@ func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 
 	_, err := config.EmployeeCollection.InsertOne(ctx, newEmployee)
 	if err != nil {
-		http.Error(w, "Failed to create employee", http.StatusInternalServerError)
+		var response model.Response
+		response.Status = "Error: Gagal membuat employee"
+		response.Response = err.Error()
+		at.WriteJSON(w, http.StatusInternalServerError, response)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Employee created successfully"})
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Employee created successfully",
+		"data":    newEmployee,
+	}
+	at.WriteJSON(w, http.StatusCreated, response)
 }
 
 
