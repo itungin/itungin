@@ -398,7 +398,7 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 // GetCustomers handles retrieving all customers
 func GetCustomers(w http.ResponseWriter, r *http.Request) {
 	// Ambil semua data pelanggan dari MongoDB
-	data, err := atdb.GetAllDoc[[]model.Customer](config.Mongoconn, "pelanggan", primitive.M{})
+	data, err := atdb.GetAllDoc[[]model.Customer](config.Mongoconn, "customers", primitive.M{})
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Data pelanggan tidak ditemukan"
