@@ -648,7 +648,7 @@ func CreateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert laporan ke dalam MongoDB
-	_, err = atdb.InsertOneDoc(config.Mongoconn, "laporan", newReport)
+	_, err = atdb.InsertOneDoc(config.Mongoconn, "financial_reports", newReport)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal Insert Database"
@@ -691,7 +691,7 @@ func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
 	// Ambil data laporan keuangan dari MongoDB
 	var report model.LaporanAkuntan
 	filter := bson.M{"_id": objectID}
-	err = config.Mongoconn.Collection("laporan").FindOne(context.TODO(), filter).Decode(&report)
+	err = config.Mongoconn.Collection("financial_reports").FindOne(context.TODO(), filter).Decode(&report)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Laporan keuangan tidak ditemukan"
@@ -712,7 +712,7 @@ func GetFinancialReportByID(w http.ResponseWriter, r *http.Request) {
 // Handler untuk mendapatkan semua laporan keuangan
 func GetFinancialReports(w http.ResponseWriter, r *http.Request) {
 	// Ambil semua data laporan keuangan dari MongoDB
-	data, err := atdb.GetAllDoc[[]model.LaporanAkuntan](config.Mongoconn, "laporan", primitive.M{})
+	data, err := atdb.GetAllDoc[[]model.LaporanAkuntan](config.Mongoconn, "financial_reports", primitive.M{})
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Data laporan keuangan tidak ditemukan"
@@ -768,7 +768,7 @@ func DeleteFinancialReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Hapus data laporan keuangan berdasarkan ID menggunakan atdb.DeleteOneDoc
-	deleteResult, err := atdb.DeleteOneDoc(config.Mongoconn, "laporan", bson.M{"_id": objectID})
+	deleteResult, err := atdb.DeleteOneDoc(config.Mongoconn, "financial_reports", bson.M{"_id": objectID})
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal menghapus laporan keuangan"
