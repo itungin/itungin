@@ -457,7 +457,7 @@ func GetCustomerByID(w http.ResponseWriter, r *http.Request) {
 	// Ambil data pelanggan dari MongoDB
 	var customer model.Customer
 	filter := bson.M{"_id": objectID}
-	err = config.Mongoconn.Collection("pelanggan").FindOne(context.TODO(), filter).Decode(&customer)
+	err = config.Mongoconn.Collection("customers").FindOne(context.TODO(), filter).Decode(&customer)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Pelanggan tidak ditemukan"
@@ -529,7 +529,7 @@ func UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	// Update pelanggan di MongoDB
 	filter := bson.M{"_id": objectID}
 	update := bson.M{"$set": updateData}
-	_, err = config.Mongoconn.Collection("pelanggan").UpdateOne(context.TODO(), filter, update)
+	_, err = config.Mongoconn.Collection("customers").UpdateOne(context.TODO(), filter, update)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal mengupdate pelanggan"
@@ -571,7 +571,7 @@ func DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 
 	// Hapus data pelanggan berdasarkan ID
 	filter := bson.M{"_id": objectID}
-	deleteResult, err := config.Mongoconn.Collection("pelanggan").DeleteOne(context.TODO(), filter)
+	deleteResult, err := config.Mongoconn.Collection("customers").DeleteOne(context.TODO(), filter)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal menghapus pelanggan"
