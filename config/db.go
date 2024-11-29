@@ -22,6 +22,18 @@ var mongoinfo = atdb.DBInfo{
 var Mongoconn, ErrorMongoconn = atdb.MongoConnect(mongoinfo)
 
 
+// Mendefinisikan MongoString secara langsung
+var MongoStringGeo string = "mongodb+srv://Cito:w.cito.a@cluster0.svl9a.mongodb.net/"
+
+// Konfigurasi database dengan nama 'akuntan'
+var mongoinfoGeo = atdb.DBInfo{
+	DBString: MongoStringGeo,
+	DBName:   "Geo",
+}
+
+var MongoconnGeo, ErrorMongoconnGeo = atdb.MongoConnect(mongoinfoGeo)
+
+
 // Membuat variabel untuk client MongoDB dan collections
 var Client *mongo.Client
 var UserCollection *mongo.Collection
