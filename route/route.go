@@ -267,6 +267,10 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.UpdateCategory(w, r)
 	case method == "DELETE" && path == "/category":
 		controller.DeleteCategory(w, r)
+
+		//Geo
+	case method == "POST" && path == "/roads":
+		controller.GetRoads(w, r)
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
