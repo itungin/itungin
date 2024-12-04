@@ -271,6 +271,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		//Geo
 	case method == "POST" && path == "/roads":
 		controller.GetRoads(w, r)
+
+	case method == "POST" && path == "/region":
+		controller.GetRoads(w, r)
 	// Google Auth
 	default:
 		controller.NotFound(w, r)
