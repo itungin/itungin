@@ -35,13 +35,15 @@ func GetRegion(respw http.ResponseWriter, req *http.Request) {
 	filter := bson.M{
 		"border": bson.M{
 			"$geoIntersects": bson.M{
-				"$geometry": bson.M{
+				"$geometry": bson.M{ // Menggunakan $geometry, bukan $border
 					"type":        "Point",
 					"coordinates": []float64{longlat.Longitude, longlat.Latitude},
 				},
 			},
 		},
 	}
+	
+	
 	region, err := atdb.GetOneDoc[model.Region](config.Mongoconn, "region", filter)
 	if err != nil {
 		at.WriteJSON(respw, http.StatusNotFound, region)
@@ -72,15 +74,15 @@ func GetRoads(respw http.ResponseWriter, req *http.Request) {
 	json.NewDecoder(req.Body).Decode(&longlat)	
 
 	filter := bson.M{
-		"geometry": bson.M{
-			"$nearSphere": bson.M{
-				"$geometry": bson.M{
-					"type":        "Point",
-					"coordinates": []float64{longlat.Longitude, longlat.Latitude},
+			"geometry": bson.M{
+				"$nearSphere": bson.M{
+					"$geometry": bson.M{		
+						"type":        "Point",
+						"coordinates": []float64{longlat.Longitude, longlat.Latitude},
+					},
+					"$maxDistance": longlat.MaxDistance,
 				},
-				"$maxDistance": longlat.MaxDistance,
 			},
-		},
 	}
 
 	roads, err := atdb.GetAllDoc[[]model.Roads](config.MongoconnGeo, "roads", filter)
