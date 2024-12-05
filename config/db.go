@@ -19,7 +19,9 @@ var mongoinfo = atdb.DBInfo{
 	DBName:   "akuntan",
 }
 
+
 var Mongoconn, ErrorMongoconn = atdb.MongoConnect(mongoinfo)
+
 
 
 // Mendefinisikan MongoString secara langsung
