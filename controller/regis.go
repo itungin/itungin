@@ -42,7 +42,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	// Gunakan salah satu pendekatan (fungsi helper atau manual)
 	// err := atdb.GetOneDoc(config.Mongoconn, "users", filter, &existingUser) // Jika fungsi helper sudah diperbaiki
-	err := config.Mongoconn.Collection("users").FindOne(context.TODO(), filter).Decode(&existingUser) // Jika manual
+	err := config.Mongoconn.Collection("user").FindOne(context.TODO(), filter).Decode(&existingUser) // Jika manual
 
 	if err == nil { // Jika tidak ada error, artinya email ditemukan
 		var response model.Response
@@ -72,7 +72,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Simpan pengguna ke database
-	_, err = atdb.InsertOneDoc(config.Mongoconn, "users", newUser)
+	_, err = atdb.InsertOneDoc(config.Mongoconn, "user", newUser)
 	if err != nil {
 		var response model.Response
 		response.Status = "Error: Gagal Insert Database"
