@@ -32,7 +32,7 @@ type User struct {
     Name     string             `bson:"name" json:"name"`
     Email    string             `bson:"email" json:"email"`
     Password string             `bson:"password" json:"password"`
-    UMKMName string             `bson:"umkm_name" json:"umkm_name"`
+    Nohp string                 `bson:"no_hp" json:"no_hp"`
 }
 
 // ExpenseTransaction adalah struct untuk transaksi pengeluaran

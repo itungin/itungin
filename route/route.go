@@ -92,27 +92,27 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "GET" && path == "/data/user":
 		controller.GetDataUser(w, r)
 	//user pendaftaran
-	case method == "POST" && path == "/auth/register/users": //mendapatkan email gmail
-		controller.RegisterGmailAuth(w, r)
+	// case method == "POST" && path == "/auth/register/users": //mendapatkan email gmail
+	// 	controller.RegisterGmailAuth(w, r)
 	case method == "POST" && path == "/data/user":
 		controller.PostDataUser(w, r)
 	case method == "POST" && path == "/upload/profpic": //upload gambar profile
-		controller.UploadProfilePictureHandler(w, r)
-	case method == "POST" && path == "/data/user/bio":
-		controller.PostDataBioUser(w, r)
+	// 	controller.UploadProfilePictureHandler(w, r)
+	// case method == "POST" && path == "/data/user/bio":
+	// 	controller.PostDataBioUser(w, r)
 		/* 	case method == "POST" && at.URLParam(path, "/data/user/wa/:nomorwa"):
 		controller.PostDataUserFromWA(w, r) */
 	//data proyek
 	case method == "GET" && path == "/data/proyek":
 		controller.GetDataProject(w, r)
-	case method == "GET" && path == "/data/proyek/approved": //akses untuk manager
-		controller.GetEditorApprovedProject(w, r)
+	// case method == "GET" && path == "/data/proyek/approved": //akses untuk manager
+	// 	controller.GetEditorApprovedProject(w, r)
 	case method == "POST" && path == "/data/proyek":
 		controller.PostDataProject(w, r)
 	case method == "PUT" && path == "/data/metadatabuku":
-		controller.PutMetaDataProject(w, r)
-	case method == "PUT" && path == "/data/proyek/publishbuku": //publish buku isbn by manager
-		controller.PutPublishProject(w, r)
+	// 	controller.PutMetaDataProject(w, r)
+	// case method == "PUT" && path == "/data/proyek/publishbuku": //publish buku isbn by manager
+	// 	controller.PutPublishProject(w, r)
 	case method == "PUT" && path == "/data/proyek":
 		controller.PutDataProject(w, r)
 	case method == "DELETE" && path == "/data/proyek":
@@ -120,38 +120,38 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "GET" && path == "/data/proyek/anggota":
 		controller.GetDataMemberProject(w, r)
 	case method == "GET" && path == "/data/proyek/editor":
-		controller.GetDataEditorProject(w, r)
-	case method == "DELETE" && path == "/data/proyek/anggota":
-		controller.DeleteDataMemberProject(w, r)
-	case method == "POST" && path == "/data/proyek/anggota":
-		controller.PostDataMemberProject(w, r)
-	case method == "POST" && path == "/data/proyek/editor": //set editor oleh owner
-		controller.PostDataEditorProject(w, r)
-	case method == "PUT" && path == "/data/proyek/editor": //set approved oleh editor
-		controller.PUtApprovedEditorProject(w, r)
-	//upload cover,draft,pdf,sampul buku project
-	case method == "POST" && at.URLParam(path, "/upload/coverbuku/:projectid"):
-		controller.UploadCoverBukuWithParamFileHandler(w, r)
-	case method == "POST" && at.URLParam(path, "/upload/draftbuku/:projectid"):
-		controller.UploadDraftBukuWithParamFileHandler(w, r)
-	case method == "POST" && at.URLParam(path, "/upload/draftpdfbuku/:projectid"):
-		controller.UploadDraftBukuPDFWithParamFileHandler(w, r)
-	case method == "POST" && at.URLParam(path, "/upload/sampulpdfbuku/:projectid"):
-		controller.UploadSampulBukuPDFWithParamFileHandler(w, r)
-	case method == "POST" && at.URLParam(path, "/upload/spk/:projectid"):
-		controller.UploadSPKPDFWithParamFileHandler(w, r)
-	case method == "POST" && at.URLParam(path, "/upload/spi/:projectid"):
-		controller.UploadSPIPDFWithParamFileHandler(w, r)
-	case method == "GET" && at.URLParam(path, "/download/draft/:path"): //downoad file draft
-		controller.AksesFileRepoDraft(w, r)
-	case method == "POST" && path == "/data/proyek/katalog": //post blog katalog
-		controller.PostKatalogBuku(w, r)
-	case method == "GET" && at.URLParam(path, "/download/dokped/spk/:namaproject"): //base64 namaproject
-		controller.GetFileDraftSPK(w, r)
-	case method == "GET" && at.URLParam(path, "/download/dokped/spkt/:namaproject"): //base64 namaproject
-		controller.GetFileDraftSPKT(w, r)
-	case method == "GET" && at.URLParam(path, "/download/dokped/spi/:path"): //base64 path sampul
-		controller.GetFileDraftSPI(w, r)
+	// 	controller.GetDataEditorProject(w, r)
+	// case method == "DELETE" && path == "/data/proyek/anggota":
+	// 	controller.DeleteDataMemberProject(w, r)
+	// case method == "POST" && path == "/data/proyek/anggota":
+	// 	controller.PostDataMemberProject(w, r)
+	// case method == "POST" && path == "/data/proyek/editor": //set editor oleh owner
+	// 	controller.PostDataEditorProject(w, r)
+	// case method == "PUT" && path == "/data/proyek/editor": //set approved oleh editor
+	// 	controller.PUtApprovedEditorProject(w, r)
+	// //upload cover,draft,pdf,sampul buku project
+	// case method == "POST" && at.URLParam(path, "/upload/coverbuku/:projectid"):
+	// 	controller.UploadCoverBukuWithParamFileHandler(w, r)
+	// case method == "POST" && at.URLParam(path, "/upload/draftbuku/:projectid"):
+	// 	controller.UploadDraftBukuWithParamFileHandler(w, r)
+	// case method == "POST" && at.URLParam(path, "/upload/draftpdfbuku/:projectid"):
+	// 	controller.UploadDraftBukuPDFWithParamFileHandler(w, r)
+	// case method == "POST" && at.URLParam(path, "/upload/sampulpdfbuku/:projectid"):
+	// 	controller.UploadSampulBukuPDFWithParamFileHandler(w, r)
+	// case method == "POST" && at.URLParam(path, "/upload/spk/:projectid"):
+	// 	controller.UploadSPKPDFWithParamFileHandler(w, r)
+	// case method == "POST" && at.URLParam(path, "/upload/spi/:projectid"):
+	// 	controller.UploadSPIPDFWithParamFileHandler(w, r)
+	// case method == "GET" && at.URLParam(path, "/download/draft/:path"): //downoad file draft
+	// 	controller.AksesFileRepoDraft(w, r)
+	// case method == "POST" && path == "/data/proyek/katalog": //post blog katalog
+	// 	controller.PostKatalogBuku(w, r)
+	// case method == "GET" && at.URLParam(path, "/download/dokped/spk/:namaproject"): //base64 namaproject
+	// 	controller.GetFileDraftSPK(w, r)
+	// case method == "GET" && at.URLParam(path, "/download/dokped/spkt/:namaproject"): //base64 namaproject
+	// 	controller.GetFileDraftSPKT(w, r)
+	// case method == "GET" && at.URLParam(path, "/download/dokped/spi/:path"): //base64 path sampul
+	// 	controller.GetFileDraftSPI(w, r)
 
 	case method == "POST" && path == "/data/proyek/menu":
 		controller.PostDataMenuProject(w, r)
@@ -186,6 +186,13 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.VerifyPasswordHandler(w, r)
 	case method == "POST" && path == "/auth/resend":
 		controller.ResendPasswordHandler(w, r)
+				// Auth FORM
+	case method == "POST" && path == "/auth/regis":
+		controller.RegisterAkunPenjual(w, r)
+	case method == "POST" && path == "/auth/login/form":
+		controller.LoginAkunPenjual(w, r)
+	case method == "GET" && path == "/auth/menu":
+		controller.GetMenu(w, r)
 		// Produk
 	case method == "POST" && path == "/products":
 		controller.CreateProduct(w, r)

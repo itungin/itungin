@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"time"
 
@@ -20,119 +21,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func RegisterGmailAuth(w http.ResponseWriter, r *http.Request) {
-	logintoken, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(r))
-	if err != nil {
-		var respn model.Response
-		respn.Status = "Error : Token Tidak Valid "
-		respn.Info = at.GetSecretFromHeader(r)
-		respn.Location = "Decode Token Error: " + at.GetLoginFromHeader(r)
-		respn.Response = err.Error()
-		at.WriteJSON(w, http.StatusForbidden, respn)
-		return
-	}
-	var request struct {
-		Token string `json:"token"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Invalid request"})
-		return
-	}
-
-	// Ambil kredensial dari database
-	creds, err := atdb.GetOneDoc[auth.GoogleCredential](config.Mongoconn, "credentials", bson.M{})
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Database Connection Problem: Unable to fetch credentials"})
-		return
-	}
-
-	// Verifikasi ID token menggunakan client_id
-	payload, err := auth.VerifyIDToken(request.Token, creds.ClientID)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Invalid token: Token verification failed"})
-		return
-	}
-
-	userInfo := model.Userdomyikado{
-		Name:                 payload.Claims["name"].(string),
-		PhoneNumber:          logintoken.Id,
-		Email:                payload.Claims["email"].(string),
-		GoogleProfilePicture: payload.Claims["picture"].(string),
-	}
-
-	// Simpan atau perbarui informasi pengguna di database
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	collection := config.Mongoconn.Collection("user")
-	filter := bson.M{"phonenumber": logintoken.Id}
-
-	var existingUser model.Userdomyikado
-	err = collection.FindOne(ctx, filter).Decode(&existingUser)
-	if err != nil || existingUser.PhoneNumber == "" {
-		// User does not exist or exists but has no phone number, insert into db
-		id, err := atdb.InsertOneDoc(config.Mongoconn, "user", userInfo)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadGateway)
-			json.NewEncoder(w).Encode(map[string]string{"message": "Database Connection Problem: Unable to fetch credentials"})
-			return
-		}
-		response := map[string]interface{}{
-			"message": "User Berhasil Terdaftar",
-			"user":    userInfo,
-			"id":      id.Hex(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
-		return
-	} else if existingUser.PhoneNumber != "" {
-		existingUser.Email = userInfo.Email
-		existingUser.GoogleProfilePicture = userInfo.GoogleProfilePicture
-		_, err := atdb.ReplaceOneDoc(config.Mongoconn, "user", bson.M{"_id": existingUser.ID}, existingUser)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadGateway)
-			json.NewEncoder(w).Encode(map[string]string{"message": "Database Connection Problem: Unable to update user"})
-			return
-		}
-		response := map[string]interface{}{
-			"message": "Authenticated successfully",
-			"user":    existingUser,
-			"id":      existingUser.ID,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	update := bson.M{
-		"$set": userInfo,
-	}
-	opts := options.Update().SetUpsert(true)
-	_, err = collection.UpdateOne(ctx, filter, update, opts)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Failed to save user info: Database update failed"})
-		return
-	}
-
-	response := map[string]interface{}{
-		"user": userInfo,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
+var PrivateKey string = os.Getenv("PRKEY")
 
 func Auth(w http.ResponseWriter, r *http.Request) {
 	var request struct {
@@ -536,7 +425,6 @@ func ResendPasswordHandler(respw http.ResponseWriter, r *http.Request) {
 	}
 	responseMessage := "User info updated and password generated successfully"
 
-	// Respond with success and the generated password
 	response := map[string]interface{}{
 		"message":     responseMessage,
 		"phonenumber": request.PhoneNumber,
@@ -545,4 +433,183 @@ func ResendPasswordHandler(respw http.ResponseWriter, r *http.Request) {
 
 	// Send the random password via WhatsApp
 	auth.SendWhatsAppPassword(respw, request.PhoneNumber, randomPassword)
+}
+
+func RegisterAkunPenjual(respw http.ResponseWriter, r *http.Request) {
+	var request model.Userdomyikado
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		respn := model.Response{
+			Status:   "Invalid Request",
+			Response: err.Error(),
+		}
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
+		return
+	}
+
+	re := regexp.MustCompile(`^62\d{9,15}$`)
+	if !re.MatchString(request.PhoneNumber) {
+		respn := model.Response{
+			Status:   "Bad Request",
+			Response: "Invalid phone number format",
+		}
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
+		return
+	}
+
+	hashedPassword, err := auth.HashPassword(request.Password)
+	if err != nil {
+		respn := model.Response{
+			Status:   "Failed to hash password",
+			Response: err.Error(),
+		}
+		at.WriteJSON(respw, http.StatusInternalServerError, respn)
+		return
+	}
+
+	role := request.Role
+	if role == "" {
+		role = "user"
+	}
+
+	newUser := model.Userdomyikado{
+		Name:          request.Name,
+		PhoneNumber:   request.PhoneNumber,
+		Email:         request.Email,
+		Team:          "pd.my.id",
+		Scope:         "dev",
+		LinkedDevice:  "v4.public.eyJhbGlhcyI6IlJvbGx5IE1hdWxhbmEgQXdhbmdnYSIsImV4cCI6IjIwMjktMDgtMDlUMTQ6MzQ6MjlaIiwiaWF0IjoiMjAyNC0wOC0wOVQwODozNDoyOVoiLCJpZCI6IjYyODEzMTIwMDAzMDAiLCJuYmYiOiIyMDI0LTA4LTA5VDA4OjM0OjI5WiJ9FXnQi5vnQ7YXHteepJ14Xcc-wPc0PLQ0n4LSbGFijfdkStVeD6QIDuwQGeaq7xETWmmtFXjfkmmfDG0WHmAlBA",
+		JumlahAntrian: 7,
+		Password:      hashedPassword,
+		Role:          role,
+	}
+
+	_, err = atdb.InsertOneDoc(config.Mongoconn, "user", newUser)
+	if err != nil {
+		respn := model.Response{
+			Status:   "Failed to insert new user",
+			Response: err.Error(),
+		}
+		at.WriteJSON(respw, http.StatusInternalServerError, respn)
+		return
+	}
+
+	response := map[string]interface{}{
+		"message":       "New user created successfully",
+		"name":          newUser.Name,
+		"phonenumber":   newUser.PhoneNumber,
+		"email":         newUser.Email,
+		"team":          newUser.Team,
+		"scope":         newUser.Scope,
+		"jumlahAntrian": newUser.JumlahAntrian,
+		"role":          newUser.Role,
+	}
+
+	at.WriteJSON(respw, http.StatusOK, response)
+}
+
+func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
+	var userRequest model.Userdomyikado
+
+	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
+		response := model.Response{
+			Status:   "Invalid Request",
+			Response: err.Error(),
+		}
+		at.WriteJSON(respw, http.StatusBadRequest, response)
+		return
+	}
+
+	var storedUser model.Userdomyikado
+	err := config.Mongoconn.Collection("user").FindOne(context.Background(), bson.M{"email": userRequest.Email}).Decode(&storedUser)
+	if err != nil {
+		response := model.Response{
+			Status:   "Error: Toko tidak ditemukan",
+			Response: "Error: " + err.Error(),
+		}
+		at.WriteJSON(respw, http.StatusNotFound, response)
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(storedUser.Password), []byte(userRequest.Password))
+	if err != nil {
+		response := model.Response{
+			Status:   "Failed to verify password",
+			Response: "Invalid password",
+		}
+		at.WriteJSON(respw, http.StatusUnauthorized, response)
+		return
+	}
+
+	encryptedToken, err := watoken.EncodeforHours(storedUser.PhoneNumber, storedUser.Name, config.PRIVATEKEY, 18)
+	if err != nil {
+		var respn model.Response
+		respn.Status = "Error: token gagal generate"
+		respn.Response = ", Error: " + err.Error()
+		at.WriteJSON(respw, http.StatusNotFound, respn)
+		return
+	}
+
+	response := map[string]interface{}{
+		"message": "Login successful",
+		"name":    storedUser.Name,
+		"email":   storedUser.Email,
+		"phone":   storedUser.PhoneNumber,
+		"team":    storedUser.Team,
+		"scope":   storedUser.Scope,
+		"token":   encryptedToken,
+		"antrian": storedUser.JumlahAntrian,
+	}
+
+	at.WriteJSON(respw, http.StatusOK, response)
+}
+
+func GetMenu(respw http.ResponseWriter, req *http.Request) {
+	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
+
+	if err != nil {
+		payload, err = watoken.Decode(config.PUBLICKEY, at.GetLoginFromHeader(req))
+
+		if err != nil {
+			var respn model.Response
+			respn.Status = "Error: Token Tidak Valid"
+			respn.Info = at.GetSecretFromHeader(req)
+			respn.Location = "Decode Token Error"
+			respn.Response = err.Error()
+			at.WriteJSON(respw, http.StatusForbidden, respn)
+			return
+		}
+	}
+
+	var datauser model.Userdomyikado
+	err = config.Mongoconn.Collection("user").FindOne(context.Background(), bson.M{"phonenumber": payload.Id}).Decode(&datauser)
+	if err != nil {
+		var respn model.Response
+		respn.Status = "Error: User tidak ditemukan"
+		respn.Response = "User with the provided role ID not found"
+		at.WriteJSON(respw, http.StatusNotFound, respn)
+		return
+	}
+
+	if datauser.Role == "user" {
+		response := map[string]interface{}{
+			"message": "Menu for user",
+			"menu":    "/user",
+		}
+		at.WriteJSON(respw, http.StatusOK, response)
+		return
+	} else if datauser.Role == "admin" {
+		response := map[string]interface{}{
+			"message": "Menu for admin",
+			"menu":    "/admin",
+		}
+		at.WriteJSON(respw, http.StatusOK, response)
+		return
+	} else {
+		response := map[string]interface{}{
+			"message": "Role not recognized",
+			"menu":    "/505",
+		}
+		at.WriteJSON(respw, http.StatusForbidden, response)
+		return
+	}
 }

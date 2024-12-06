@@ -270,3 +270,4 @@ func PutNomorBlast(respw http.ResponseWriter, req *http.Request) {
 	//kirim ke frontend
 	at.WriteJSON(respw, http.StatusOK, qrstat)
 }
+
