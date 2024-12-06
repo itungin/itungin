@@ -1,204 +1,174 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gocroot/config"
-	"github.com/gocroot/model"
 	"github.com/gocroot/helper/at"
+	"github.com/gocroot/helper/atdb"
+	"github.com/gocroot/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Fungsi untuk menambahkan kategori baru
-func CreateCategory(w http.ResponseWriter, r *http.Request) {
-	var newCategory model.Category
-	if err := json.NewDecoder(r.Body).Decode(&newCategory); err != nil {
-		var response model.Response
-		response.Status = "Error: Bad Request"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func CreateCategory(respw http.ResponseWriter, req *http.Request) {
+	var category model.Category
+	if err := json.NewDecoder(req.Body).Decode(&category); err != nil {
+		var respn model.Response
+		respn.Status = "Error: Bad Request"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	// Set waktu pembuatan kategori
-	newCategory.CreatedAt = time.Now()
+	newCategory := model.Category{
+		Name:        category.Name,
+		Description: category.Description,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
 
-	// Insert kategori ke MongoDB
-	_, err := config.CategoryCollection.InsertOne(context.Background(), newCategory)
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "kategori", newCategory)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal Insert Database"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+		var respn model.Response
+		respn.Status = "Error: Gagal Insert Database"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusNotModified, respn)
 		return
 	}
 
-	// Kirim respon sukses
 	response := map[string]interface{}{
 		"status":  "success",
-		"message": "Kategori berhasil dibuat",
+		"message": "Kategori berhasil ditambahkan",
 		"data":    newCategory,
 	}
-	at.WriteJSON(w, http.StatusCreated, response)
+	at.WriteJSON(respw, http.StatusOK, response)
 }
 
-// Fungsi untuk mendapatkan daftar kategori
-func GetCategories(w http.ResponseWriter, r *http.Request) {
-	var categories []model.Category
-
-	// Ambil data dari MongoDB
-	cursor, err := config.CategoryCollection.Find(context.Background(), bson.M{})
-	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal mengambil data kategori"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
-		return
-	}
-	defer cursor.Close(context.Background())
-
-	// Decode hasil pencarian kategori
-	for cursor.Next(context.Background()) {
-		var category model.Category
-		if err := cursor.Decode(&category); err != nil {
-			var response model.Response
-			response.Status = "Error: Gagal mendekode kategori"
-			at.WriteJSON(w, http.StatusInternalServerError, response)
-			return
-		}
-		categories = append(categories, category)
-	}
-
-	// Kirim data kategori sebagai respon
-	at.WriteJSON(w, http.StatusOK, categories)
-}
-
-// Fungsi untuk mendapatkan detail kategori berdasarkan ID
-func GetCategoryByID(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		var response model.Response
-		response.Status = "Error: ID Kategori tidak ditemukan"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func GetAllCategory(respw http.ResponseWriter, req *http.Request) {
+	data, err := atdb.GetAllDoc[[]model.Category](config.Mongoconn, "kategori", primitive.M{})
+	if err != nil || len(data) == 0 {
+		var respn model.Response
+		respn.Status = "Error: Data kategori tidak ditemukan atau kosong"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	at.WriteJSON(respw, http.StatusOK, data)
+}
+
+func GetCategoryByID(respw http.ResponseWriter, req *http.Request) {
+	categoryID := req.URL.Query().Get("id")
+	if categoryID == "" {
+		var respn model.Response
+		respn.Status = "Error: ID Category tidak ditemukan"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(categoryID)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: ID Kategori tidak valid"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+		var respn model.Response
+		respn.Status = "Error: ID Category tidak valid"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
 	var category model.Category
-	err = config.CategoryCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&category)
+	filter := bson.M{"_id": objectID}
+	_, err = atdb.GetOneDoc[model.Category](config.Mongoconn, "kategori", filter)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Kategori tidak ditemukan"
-		at.WriteJSON(w, http.StatusNotFound, response)
+		var respn model.Response
+		respn.Status = "Error: Category tidak ditemukan"
+		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
-	response := map[string]interface{}{
-		"status":  "success",
-		"message": "Kategori ditemukan",
-		"data":    category,
-	}
-	at.WriteJSON(w, http.StatusOK, response)
+	at.WriteJSON(respw, http.StatusOK, category)
 }
 
-// Fungsi untuk mengupdate kategori berdasarkan ID
-func UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		var response model.Response
-		response.Status = "Error: ID Kategori tidak ditemukan"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func UpdateCategory(respw http.ResponseWriter, req *http.Request) {
+	categoryID := req.URL.Query().Get("id")
+	if categoryID == "" {
+		var respn model.Response
+		respn.Status = "Error: ID Category tidak ditemukan"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(categoryID)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: ID Kategori tidak valid"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+		var respn model.Response
+		respn.Status = "Error: ID Category tidak valid"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	var updatedCategory model.Category
-	if err := json.NewDecoder(r.Body).Decode(&updatedCategory); err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal membaca data JSON"
-		at.WriteJSON(w, http.StatusBadRequest, response)
-		return
+	var requestBody struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
 	}
-
-	updateData := bson.M{
-		"name":        updatedCategory.Name,
-		"description": updatedCategory.Description,
-		"updatedAt":   time.Now(),
-	}
-
-	_, err = config.CategoryCollection.UpdateOne(context.Background(), bson.M{"_id": objectID}, bson.M{"$set": updateData})
+	err = json.NewDecoder(req.Body).Decode(&requestBody)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal mengupdate kategori"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+		var respn model.Response
+		respn.Status = "Error: Gagal membaca data JSON"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	response := map[string]interface{}{
-		"status":  "success",
-		"message": "Kategori berhasil diupdate",
-		"data":    updateData,
+	updateData := bson.M{}
+	if requestBody.Name != "" {
+		updateData["name"] = requestBody.Name
 	}
-	at.WriteJSON(w, http.StatusOK, response)
+	if requestBody.Description != "" {
+		updateData["description"] = requestBody.Description
+	}
+	updateData["updatedAt"] = time.Now()
+
+	update := bson.M{"$set": updateData}
+	_, err = atdb.UpdateOneDoc(config.Mongoconn, "kategori", bson.M{"_id": objectID}, update)
+	if err != nil {
+		var respn model.Response
+		respn.Status = "Error: Gagal mengupdate category"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusNotModified, respn)
+		return
+	}
+
+	at.WriteJSON(respw, http.StatusOK, updateData)
 }
 
-
-// Fungsi untuk menghapus kategori berdasarkan ID
-func DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		var response model.Response
-		response.Status = "Error: ID Kategori tidak ditemukan"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func DeleteCategory(respw http.ResponseWriter, req *http.Request) {
+	categoryID := req.URL.Query().Get("id")
+	if categoryID == "" {
+		var respn model.Response
+		respn.Status = "Error: ID Category tidak ditemukan"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(categoryID)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: ID Kategori tidak valid"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+		var respn model.Response
+		respn.Status = "Error: ID Category tidak valid"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	deleteResult, err := config.CategoryCollection.DeleteOne(context.Background(), bson.M{"_id": objectID})
-	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal menghapus kategori"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+	deleteResult, err := atdb.DeleteOneDoc(config.Mongoconn, "kategori", bson.M{"_id": objectID})
+	if err != nil || deleteResult.DeletedCount == 0 {
+		var respn model.Response
+		respn.Status = "Error: Gagal menghapus category atau category tidak ditemukan"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusInternalServerError, respn)
 		return
 	}
 
-	if deleteResult.DeletedCount == 0 {
-		var response model.Response
-		response.Status = "Error: Kategori tidak ditemukan"
-		at.WriteJSON(w, http.StatusNotFound, response)
-		return
-	}
-
-	response := map[string]interface{}{
+	at.WriteJSON(respw, http.StatusOK, map[string]interface{}{
 		"status":  "success",
-		"message": "Kategori berhasil dihapus",
-	}
-	at.WriteJSON(w, http.StatusOK, response)
+		"message": "Category berhasil dihapus",
+	})
 }

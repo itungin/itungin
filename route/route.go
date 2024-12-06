@@ -191,8 +191,8 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.RegisterAkunPenjual(w, r)
 	case method == "POST" && path == "/auth/login/form":
 		controller.LoginAkunPenjual(w, r)
-	case method == "GET" && path == "/auth/menu":
-		controller.GetMenu(w, r)
+	// case method == "GET" && path == "/auth/menu":
+	// 	controller.GetMenu(w, r)
 		// Produk
 	case method == "POST" && path == "/products":
 		controller.CreateProduct(w, r)
@@ -256,7 +256,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "POST" && path == "/employee":
 		controller.CreateEmployee(w, r)
 	case method == "GET" && path == "/employees":
-		controller.GetEmployees(w, r)
+		controller.GetAllEmployees(w, r)
 	case method == "GET" && path == "/employee":
 		controller.GetEmployeeByID(w, r)
 	case method == "PUT" && path == "/employee":
@@ -267,7 +267,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "POST" && path == "/category":
 		controller.CreateCategory(w, r)
 	case method == "GET" && path == "/categories":
-		controller.GetCategories(w, r)
+		controller.GetAllCategory(w, r)
 	case method == "GET" && path == "/category":
 		controller.GetCategoryByID(w, r)
 	case method == "PUT" && path == "/category":
@@ -276,7 +276,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.DeleteCategory(w, r)
 		//register
 	case method == "POST" && path == "/register":
-		controller.RegisterUser(w, r)
+		controller.RegisterAkunPenjual(w, r)
+	case method == "POST" && path == "/login":
+		controller.LoginAkunPenjual(w, r)
 		//Geo
 	case method == "POST" && path == "/roads":
 		controller.GetRoads(w, r)

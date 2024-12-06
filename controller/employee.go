@@ -1,27 +1,27 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gocroot/config"
 	"github.com/gocroot/model"
-    "github.com/gocroot/helper/at"
+	"github.com/gocroot/helper/at"
+	"github.com/gocroot/helper/atdb"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // CreateEmployee handles creating a new employee
-func CreateEmployee(w http.ResponseWriter, r *http.Request) {
+func CreateEmployee(respw http.ResponseWriter, req *http.Request) {
 	var newEmployee model.Employee
-	if err := json.NewDecoder(r.Body).Decode(&newEmployee); err != nil {
-		var response model.Response
-		response.Status = "Error: Bad Request"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusBadRequest, response)
+	if err := json.NewDecoder(req.Body).Decode(&newEmployee); err != nil {
+		var respn model.Response
+		respn.Status = "Error: Bad Request"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
@@ -29,15 +29,13 @@ func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 	newEmployee.CreatedAt = time.Now()
 	newEmployee.UpdatedAt = time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := config.EmployeeCollection.InsertOne(ctx, newEmployee)
+	// Insert into MongoDB collection
+	_, err := atdb.InsertOneDoc(config.Mongoconn, "employee", newEmployee)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal membuat employee"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+		var respn model.Response
+		respn.Status = "Error: Gagal Insert Database"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusNotModified, respn)
 		return
 	}
 
@@ -46,70 +44,65 @@ func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		"message": "Employee created successfully",
 		"data":    newEmployee,
 	}
-	at.WriteJSON(w, http.StatusCreated, response)
+	at.WriteJSON(respw, http.StatusOK, response)
 }
 
-
-// GetEmployees returns all employees
-func GetEmployees(w http.ResponseWriter, r *http.Request) {
-	var employees []model.Employee
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := config.EmployeeCollection.Find(ctx, bson.M{})
+// GetAllEmployees returns all employees
+func GetAllEmployees(respw http.ResponseWriter, req *http.Request) {
+	data, err := atdb.GetAllDoc[[]model.Employee](config.Mongoconn, "employee", bson.M{})
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal mengambil data employees"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+		var respn model.Response
+		respn.Status = "Error: Data employees tidak ditemukan"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var emp model.Employee
-		if err := cursor.Decode(&emp); err != nil {
-			var response model.Response
-			response.Status = "Error: Gagal mendekode employee"
-			at.WriteJSON(w, http.StatusInternalServerError, response)
-			return
-		}
-		employees = append(employees, emp)
+	if len(data) == 0 {
+		var respn model.Response
+		respn.Status = "Error: Data employees kosong"
+		at.WriteJSON(respw, http.StatusNotFound, respn)
+		return
 	}
 
-	at.WriteJSON(w, http.StatusOK, employees)
+	// Format hasil sebagai slice of map dengan ID dan name untuk setiap employee
+	var employees []map[string]interface{}
+	for _, employee := range data {
+		employees = append(employees, map[string]interface{}{
+			"id":       employee.ID,
+			"name":     employee.Name,
+			"position": employee.Position,
+		})
+	}
+
+	at.WriteJSON(respw, http.StatusOK, employees)
 }
-
-
 
 // GetEmployeeByID retrieves an employee by ID
-func GetEmployeeByID(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		var response model.Response
-		response.Status = "Error: ID tidak ditemukan"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func GetEmployeeByID(respw http.ResponseWriter, req *http.Request) {
+	employeeID := req.URL.Query().Get("id")
+	if employeeID == "" {
+		var respn model.Response
+		respn.Status = "Error: ID Employee tidak ditemukan"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(employeeID)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: ID tidak valid"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+		var respn model.Response
+		respn.Status = "Error: ID Employee tidak valid"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
 	var employee model.Employee
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.EmployeeCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&employee)
+	filter := bson.M{"_id": objectID}
+	_, err = atdb.GetOneDoc[model.Employee](config.Mongoconn, "employee", filter)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Employee tidak ditemukan"
-		at.WriteJSON(w, http.StatusNotFound, response)
+		var respn model.Response
+		respn.Status = "Error: Employee tidak ditemukan"
+		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
@@ -118,33 +111,33 @@ func GetEmployeeByID(w http.ResponseWriter, r *http.Request) {
 		"message": "Employee ditemukan",
 		"data":    employee,
 	}
-	at.WriteJSON(w, http.StatusOK, response)
+	at.WriteJSON(respw, http.StatusOK, response)
 }
 
 // UpdateEmployee updates an employee by ID
-func UpdateEmployee(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		var response model.Response
-		response.Status = "Error: ID tidak ditemukan"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func UpdateEmployee(respw http.ResponseWriter, req *http.Request) {
+	employeeID := req.URL.Query().Get("id")
+	if employeeID == "" {
+		var respn model.Response
+		respn.Status = "Error: ID Employee tidak ditemukan"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(employeeID)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: ID tidak valid"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+		var respn model.Response
+		respn.Status = "Error: ID Employee tidak valid"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
 	var updatedEmployee model.Employee
-	if err := json.NewDecoder(r.Body).Decode(&updatedEmployee); err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal membaca data JSON"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusBadRequest, response)
+	if err := json.NewDecoder(req.Body).Decode(&updatedEmployee); err != nil {
+		var respn model.Response
+		respn.Status = "Error: Gagal membaca data JSON"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
@@ -158,15 +151,14 @@ func UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = config.EmployeeCollection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	// Perform the update
+	filter := bson.M{"_id": objectID}
+	_, err = atdb.UpdateOneDoc(config.Mongoconn, "employee", filter, update)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal mengupdate employee"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+		var respn model.Response
+		respn.Status = "Error: Gagal mengupdate employee"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusNotModified, respn)
 		return
 	}
 
@@ -175,43 +167,41 @@ func UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		"message": "Employee updated successfully",
 		"data":    update,
 	}
-	at.WriteJSON(w, http.StatusOK, response)
+	at.WriteJSON(respw, http.StatusOK, response)
 }
 
 // DeleteEmployee deletes an employee by ID
-func DeleteEmployee(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		var response model.Response
-		response.Status = "Error: ID tidak ditemukan"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+func DeleteEmployee(respw http.ResponseWriter, req *http.Request) {
+	employeeID := req.URL.Query().Get("id")
+	if employeeID == "" {
+		var respn model.Response
+		respn.Status = "Error: ID Employee tidak ditemukan"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	objectID, err := primitive.ObjectIDFromHex(employeeID)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: ID tidak valid"
-		at.WriteJSON(w, http.StatusBadRequest, response)
+		var respn model.Response
+		respn.Status = "Error: ID Employee tidak valid"
+		at.WriteJSON(respw, http.StatusBadRequest, respn)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	deleteResult, err := config.EmployeeCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	filter := bson.M{"_id": objectID}
+	deleteResult, err := atdb.DeleteOneDoc(config.Mongoconn, "employee", filter)
 	if err != nil {
-		var response model.Response
-		response.Status = "Error: Gagal menghapus employee"
-		response.Response = err.Error()
-		at.WriteJSON(w, http.StatusInternalServerError, response)
+		var respn model.Response
+		respn.Status = "Error: Gagal menghapus employee"
+		respn.Response = err.Error()
+		at.WriteJSON(respw, http.StatusInternalServerError, respn)
 		return
 	}
 
 	if deleteResult.DeletedCount == 0 {
-		var response model.Response
-		response.Status = "Error: Employee tidak ditemukan"
-		at.WriteJSON(w, http.StatusNotFound, response)
+		var respn model.Response
+		respn.Status = "Error: Employee tidak ditemukan"
+		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
@@ -219,5 +209,5 @@ func DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"message": "Employee deleted successfully",
 	}
-	at.WriteJSON(w, http.StatusOK, response)
+	at.WriteJSON(respw, http.StatusOK, response)
 }
