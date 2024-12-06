@@ -501,66 +501,9 @@ func RegisterAkunPenjual(respw http.ResponseWriter, r *http.Request) {
 	at.WriteJSON(respw, http.StatusOK, response)
 }
 
-// func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
-// 	var userRequest model.Userdomyikado
-
-// 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
-// 		response := model.Response{
-// 			Status:   "Invalid Request",
-// 			Response: err.Error(),
-// 		}
-// 		at.WriteJSON(respw, http.StatusBadRequest, response)
-// 		return
-// 	}
-
-// 	var storedUser model.Userdomyikado
-// 	err := config.Mongoconn.Collection("user").FindOne(context.Background(), bson.M{"email": userRequest.Email}).Decode(&storedUser)
-// 	if err != nil {
-// 		response := model.Response{
-// 			Status:   "Error: Toko tidak ditemukan",
-// 			Response: "Error: " + err.Error(),
-// 		}
-// 		at.WriteJSON(respw, http.StatusNotFound, response)
-// 		return
-// 	}
-
-// 	err = bcrypt.CompareHashAndPassword([]byte(storedUser.Password), []byte(userRequest.Password))
-// 	if err != nil {
-// 		response := model.Response{
-// 			Status:   "Failed to verify password",
-// 			Response: "Invalid password",
-// 		}
-// 		at.WriteJSON(respw, http.StatusUnauthorized, response)
-// 		return
-// 	}
-
-// 	encryptedToken, err := watoken.EncodeforHours(storedUser.PhoneNumber, storedUser.Name, config.PRIVATEKEY, 18)
-// 	if err != nil {
-// 		var respn model.Response
-// 		respn.Status = "Error: token gagal generate"
-// 		respn.Response = ", Error: " + err.Error()
-// 		at.WriteJSON(respw, http.StatusNotFound, respn)
-// 		return
-// 	}
-
-// 	response := map[string]interface{}{
-// 		"message": "Login successful",
-// 		"name":    storedUser.Name,
-// 		"email":   storedUser.Email,
-// 		"phone":   storedUser.PhoneNumber,
-// 		"team":    storedUser.Team,
-// 		"scope":   storedUser.Scope,
-// 		"token":   encryptedToken,
-// 		"antrian": storedUser.JumlahAntrian,
-// 	}
-
-// 	at.WriteJSON(respw, http.StatusOK, response)
-// }
-
 func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
 	var userRequest model.Userdomyikado
 
-	// Decode request body ke userRequest
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
 		response := model.Response{
 			Status:   "Invalid Request",
@@ -570,7 +513,6 @@ func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cari user berdasarkan email
 	var storedUser model.Userdomyikado
 	err := config.Mongoconn.Collection("user").FindOne(context.Background(), bson.M{"email": userRequest.Email}).Decode(&storedUser)
 	if err != nil {
@@ -582,7 +524,6 @@ func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verifikasi password
 	err = bcrypt.CompareHashAndPassword([]byte(storedUser.Password), []byte(userRequest.Password))
 	if err != nil {
 		response := model.Response{
@@ -593,27 +534,15 @@ func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate token JWT
 	encryptedToken, err := watoken.EncodeforHours(storedUser.PhoneNumber, storedUser.Name, config.PRIVATEKEY, 18)
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error: token gagal generate"
 		respn.Response = ", Error: " + err.Error()
-		at.WriteJSON(respw, http.StatusInternalServerError, respn)
+		at.WriteJSON(respw, http.StatusNotFound, respn)
 		return
 	}
 
-	// Set token ke cookie
-	http.SetCookie(respw, &http.Cookie{
-		Name:     "login",
-		Value:    encryptedToken,
-		Path:     "/",
-		Expires:  time.Now().Add(18 * time.Hour),
-		HttpOnly: true, // Untuk keamanan, cookie hanya bisa diakses oleh HTTP(S)
-		Secure:   true, // Pastikan menggunakan HTTPS
-	})
-
-	// Kirim response JSON
 	response := map[string]interface{}{
 		"message": "Login successful",
 		"name":    storedUser.Name,
@@ -621,8 +550,79 @@ func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
 		"phone":   storedUser.PhoneNumber,
 		"team":    storedUser.Team,
 		"scope":   storedUser.Scope,
+		"token":   encryptedToken,
 		"antrian": storedUser.JumlahAntrian,
 	}
 
 	at.WriteJSON(respw, http.StatusOK, response)
 }
+
+// func LoginAkunPenjual(respw http.ResponseWriter, r *http.Request) {
+// 	var userRequest model.Userdomyikado
+
+// 	// Decode request body ke userRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
+// 		response := model.Response{
+// 			Status:   "Invalid Request",
+// 			Response: err.Error(),
+// 		}
+// 		at.WriteJSON(respw, http.StatusBadRequest, response)
+// 		return
+// 	}
+
+// 	// Cari user berdasarkan email
+// 	var storedUser model.Userdomyikado
+// 	err := config.Mongoconn.Collection("user").FindOne(context.Background(), bson.M{"email": userRequest.Email}).Decode(&storedUser)
+// 	if err != nil {
+// 		response := model.Response{
+// 			Status:   "Error: Toko tidak ditemukan",
+// 			Response: "Error: " + err.Error(),
+// 		}
+// 		at.WriteJSON(respw, http.StatusNotFound, response)
+// 		return
+// 	}
+
+// 	// Verifikasi password
+// 	err = bcrypt.CompareHashAndPassword([]byte(storedUser.Password), []byte(userRequest.Password))
+// 	if err != nil {
+// 		response := model.Response{
+// 			Status:   "Failed to verify password",
+// 			Response: "Invalid password",
+// 		}
+// 		at.WriteJSON(respw, http.StatusUnauthorized, response)
+// 		return
+// 	}
+
+// 	// Generate token JWT
+// 	encryptedToken, err := watoken.EncodeforHours(storedUser.PhoneNumber, storedUser.Name, config.PRIVATEKEY, 18)
+// 	if err != nil {
+// 		var respn model.Response
+// 		respn.Status = "Error: token gagal generate"
+// 		respn.Response = ", Error: " + err.Error()
+// 		at.WriteJSON(respw, http.StatusInternalServerError, respn)
+// 		return
+// 	}
+
+// 	// Set token ke cookie
+// 	http.SetCookie(respw, &http.Cookie{
+// 		Name:     "login",
+// 		Value:    encryptedToken,
+// 		Path:     "/",
+// 		Expires:  time.Now().Add(18 * time.Hour),
+// 		HttpOnly: true, // Untuk keamanan, cookie hanya bisa diakses oleh HTTP(S)
+// 		Secure:   true, // Pastikan menggunakan HTTPS
+// 	})
+
+// 	// Kirim response JSON
+// 	response := map[string]interface{}{
+// 		"message": "Login successful",
+// 		"name":    storedUser.Name,
+// 		"email":   storedUser.Email,
+// 		"phone":   storedUser.PhoneNumber,
+// 		"team":    storedUser.Team,
+// 		"scope":   storedUser.Scope,
+// 		"antrian": storedUser.JumlahAntrian,
+// 	}
+
+// 	at.WriteJSON(respw, http.StatusOK, response)
+// }
