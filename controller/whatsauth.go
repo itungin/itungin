@@ -22,50 +22,28 @@ func GetHome(respw http.ResponseWriter, req *http.Request) {
 }
 
 func PostInboxNomor(respw http.ResponseWriter, req *http.Request) {
-    var resp itmodel.Response
-    var msg itmodel.IteungMessage
-    httpstatus := http.StatusUnauthorized
-    resp.Response = "Wrong Secret or Phone Number Not Registered"
-
-    // Ambil nomor WA dari request
-    waphonenumber := at.GetParam(req)
-
-    // Validasi apakah nomor HP terdaftar di database
-    var user struct {
-        NoHP string `bson:"no_hp"`
-    }
-	err := config.Mongoconn.Client().Database("akuntan").Collection("user").FindOne(req.Context(), bson.M{"no_hp": waphonenumber}).Decode(&user)
-    if err != nil {
-        // Jika nomor tidak ditemukan, balikan respon
-        resp.Response = "Phone number not registered"
-        at.WriteJSON(respw, httpstatus, resp)
-        return
-    }
-
-    // Dapatkan profil aplikasi
-    prof, err := whatsauth.GetAppProfile(waphonenumber, config.Mongoconn)
-    if err != nil {
-        resp.Response = err.Error()
-        httpstatus = http.StatusServiceUnavailable
-        at.WriteJSON(respw, httpstatus, resp)
-        return
-    }
-
-    // Cek Secret dari header
-    if at.GetSecretFromHeader(req) == prof.Secret {
-        // Decode pesan dari body
-        err := json.NewDecoder(req.Body).Decode(&msg)
-        if err != nil {
-            resp.Response = err.Error()
-        } else {
-            // Proses WebHook
-            resp, err = whatsauth.WebHook(prof, msg, config.Mongoconn)
-            if err != nil {
-                resp.Response = err.Error()
-            }
-        }
-    }
-    at.WriteJSON(respw, httpstatus, resp)
+	var resp itmodel.Response
+	var msg itmodel.IteungMessage
+	httpstatus := http.StatusUnauthorized
+	resp.Response = "Wrong Secret"
+	waphonenumber := at.GetParam(req)
+	prof, err := whatsauth.GetAppProfile(waphonenumber, config.Mongoconn)
+	if err != nil {
+		resp.Response = err.Error()
+		httpstatus = http.StatusServiceUnavailable
+	}
+	if at.GetSecretFromHeader(req) == prof.Secret {
+		err := json.NewDecoder(req.Body).Decode(&msg)
+		if err != nil {
+			resp.Response = err.Error()
+		} else {
+			resp, err = whatsauth.WebHook(prof, msg, config.Mongoconn)
+			if err != nil {
+				resp.Response = err.Error()
+			}
+		}
+	}
+	at.WriteJSON(respw, httpstatus, resp)
 }
 
 // jalan setiap jam 3 pagi
