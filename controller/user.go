@@ -47,7 +47,7 @@ func GetDataUser(respw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		var respn model.Response
 		respn.Status = "Error : Token Tidak Valid "
-		respn.Info = at.GetSecretFromHeader(req)
+		respn.Info = config.PublicKeyWhatsAuth
 		respn.Location = "Decode Token Error: " + at.GetLoginFromHeader(req)
 		respn.Response = err.Error()
 		at.WriteJSON(respw, http.StatusForbidden, respn)
@@ -63,7 +63,6 @@ func GetDataUser(respw http.ResponseWriter, req *http.Request) {
 	docuser.Name = payload.Alias
 	at.WriteJSON(respw, http.StatusOK, docuser)
 }
-
 // melakukan pengecekan apakah suda link device klo ada generate token 5tahun
 func PutTokenDataUser(respw http.ResponseWriter, req *http.Request) {
 	payload, err := watoken.Decode(config.PublicKeyWhatsAuth, at.GetLoginFromHeader(req))
